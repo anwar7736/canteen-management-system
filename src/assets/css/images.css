@@ -1,0 +1,80 @@
+.cat-icon{
+    width: 60px;
+    height: 60px;
+    object-fit: scale-down;
+}
+.product-img{
+    width: 80px;
+    height: 80px;
+    object-fit: scale-down;
+}
+.cart-image{
+    width: 60px;
+    height: 60px;
+    object-fit: scale-down;
+}
+.table-cell-img{
+	height: 100px;
+	width: 100px;
+}
+.prevIMG{
+    height:  200px;
+    width: 200px;
+    border : 5px solid red;
+    border-radius: 50%;
+    margin-left:  50px;
+}
+
+.token_preview{
+    margin-bottom: 100px;
+    padding : 20px;
+    border : 10px solid red;
+
+}
+.token_section{
+    margin:auto; 
+    padding : 30px;
+    border : 10px solid red;
+}
+
+@media only screen and (max-width: 991px) {
+    .profile_picture{
+    margin-left:  420px;
+    }
+}
+
+@media only screen and (max-width: 876px) {
+    .profile_picture{
+    margin-left:  360px;
+    }
+}
+
+@media only screen and (max-width: 768px) {
+    .profile_picture{
+    margin-left:  300px;
+    }
+}
+
+@media only screen and (max-width: 662px) {
+    .profile_picture{
+    margin-left:  250px;
+    }
+}
+
+@media only screen and (max-width: 576px) {
+    .profile_picture{
+    margin-left:  200px;
+    }
+}
+
+@media only screen and (max-width: 480px) {
+    .profile_picture{
+    margin-left:  160px;
+    }
+}
+@media only screen and (max-width: 360px) {
+    .profile_picture{
+    margin-left:  100px;
+    }
+}
+
