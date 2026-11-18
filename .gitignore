@@ -21,7 +21,6 @@
 **/storage/app/public/*
 !**/storage/app/public/.gitignore
 /backend/cms.sql
-/backend/database/cms.sql
 /Canteen-Management-System-Admin-Panel/
 /Canteen-Management-System-User-Panel/
 /Canteen-Management-System-API/
