@@ -1,0 +1,81 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
+
+class RouteServiceProvider extends ServiceProvider
+{
+    /**
+     * The path to the "home" route for your application.
+     *
+     * This is used by Laravel authentication to redirect users after login.
+     *
+     * @var string
+     */
+    public const HOME = '/home';
+
+    /**
+     * The controller namespace for the application.
+     *
+     * When present, controller route declarations will automatically be prefixed with this namespace.
+     *
+     * @var string|null
+     */
+    // protected $namespace = 'App\\Http\\Controllers';
+
+    /**
+     * Define your route model bindings, pattern filters, etc.
+     *
+     * @return void
+     */
+    public function boot(): void
+    {
+        $this->configureRateLimiting();
+
+        $this->routes(function () {
+            Route::prefix('api')
+                ->middleware('api')
+                ->group(base_path('routes/api.php'));
+
+            Route::middleware('web')
+                ->group(base_path('routes/web.php'));
+        });
+    }
+
+    /**
+     * Configure the rate limiters for the application.
+     *
+     * @return void
+     */
+    protected function configureRateLimiting()
+    {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->getAuthIdentifier() ?: $request->ip());
+        });
+
+        RateLimiter::for('auth-login', function (Request $request) {
+            $username = strtolower((string) $request->input('username'));
+            $ip = $request->ip();
+
+            return [
+                Limit::perMinute(20)->by('login-ip:'.$ip),
+                Limit::perMinute(5)->by('login-account:'.$ip.':'.$username),
+            ];
+        });
+
+        RateLimiter::for('password-reset', function (Request $request) {
+            $email = strtolower((string) $request->input('email'));
+            $ip = $request->ip();
+
+            return [
+                Limit::perMinute(10)->by('reset-ip:'.$ip),
+                Limit::perMinute(3)->by('reset-email:'.$ip.':'.$email),
+            ];
+        });
+    }
+}
