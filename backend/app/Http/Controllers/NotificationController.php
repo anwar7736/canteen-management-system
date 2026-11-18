@@ -25,9 +25,10 @@ class NotificationController extends Controller
 
         if($receivers === 'ForAllUser')
         {
-            $users = User::where('role', 'user')->get();
             $data = ['title' => $msg_title, 'body' => $msg_body];
-            Notification::send($users, new AdminNotification($data));
+            User::where('role', 'user')->orderBy('id')->chunkById(500, function ($users) use ($data) {
+                Notification::send($users, new AdminNotification($data));
+            });
 
             return 1;
         }
@@ -69,12 +70,8 @@ class NotificationController extends Controller
                 'create_time' => $createdAt->format('H:i:s'),
             ]);
 
-            $recipientIds = $author->role === 'admin'
-                ? User::where('role', 'user')->pluck('id')
-                : User::where('role', 'admin')->limit(1)->pluck('id');
-
-            if ($recipientIds->isNotEmpty()) {
-                $rows = $recipientIds->map(fn ($userId) => [
+            $insertRecipients = function ($userIds) use ($notificationId, $createdAt) {
+                $rows = collect($userIds)->map(fn ($userId) => [
                     'notification_id' => $notificationId,
                     'user_id' => $userId,
                     'status' => 'Latest',
@@ -82,7 +79,22 @@ class NotificationController extends Controller
                     'create_time' => $createdAt->format('H:i:s'),
                 ])->all();
 
-                NotificationDetail::insert($rows);
+                if ($rows) {
+                    NotificationDetail::insert($rows);
+                }
+            };
+
+            if ($author->role === 'admin') {
+                User::where('role', 'user')
+                    ->select('id')
+                    ->chunkById(500, function ($users) use ($insertRecipients) {
+                        $insertRecipients($users->pluck('id'));
+                    });
+            } else {
+                $adminId = User::where('role', 'admin')->value('id');
+                if ($adminId !== null) {
+                    $insertRecipients([$adminId]);
+                }
             }
 
             return 1;

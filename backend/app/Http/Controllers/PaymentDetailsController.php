@@ -185,7 +185,8 @@ class PaymentDetailsController extends Controller
 
     private function refreshStatement(MonthlyStatement $statement): void
     {
-        $totalPayment = Payment::where('token_no', $statement->token_no)
+        $totalPayment = Payment::settled()
+            ->where('token_no', $statement->token_no)
             ->where('year', $statement->year)
             ->where('month', $statement->month)
             ->sum('amount');

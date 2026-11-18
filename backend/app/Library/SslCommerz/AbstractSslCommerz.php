@@ -46,14 +46,12 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
     public function callToApi($data, $header = [], $setLocalhost = false)
     {
         $curl = curl_init();
-
-        if (!$setLocalhost) {
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2); // The default value for this option is 2. It means, it has to have the same name in the certificate as is in the URL you operate against.
-        } else {
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 0); // When the verify value is 0, the connection succeeds regardless of the names in the certificate.
+        if ($curl === false) {
+            return 'FAILED TO CONNECT WITH SSLCOMMERZ API';
         }
+
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
 
         curl_setopt($curl, CURLOPT_URL, $this->getApiUrl());
         curl_setopt($curl, CURLOPT_HEADER, 0);
@@ -65,17 +63,15 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
         curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
 
         $response = curl_exec($curl);
-        $err = curl_error($curl);
         $code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
         $curlErrorNo = curl_errno($curl);
         curl_close($curl);
 
-        if ($code == 200 & !($curlErrorNo)) {
+        if ($code === 200 && !$curlErrorNo && $response !== false) {
             return $response;
-        } else {
-            return "FAILED TO CONNECT WITH SSLCOMMERZ API";
-            //return "cURL Error #:" . $err;
         }
+
+        return 'FAILED TO CONNECT WITH SSLCOMMERZ API';
     }
 
     /**
@@ -87,6 +83,9 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
     public function formatResponse($response, $type = 'checkout', $pattern = 'json')
     {
         $sslcz = json_decode($response, true);
+        if (!is_array($sslcz)) {
+            $sslcz = [];
+        }
 
         if ($type != 'checkout') {
             return $sslcz;
@@ -99,7 +98,11 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
                     $response = json_encode(['status' => 'success', 'data' => $sslcz['GatewayPageURL'], 'logo' => $sslcz['storeLogo']]);
                 }
             } else {
-                $response = json_encode(['status' => 'fail', 'data' => null, 'message' => $sslcz['failedreason']]);
+                $response = json_encode([
+                    'status' => 'fail',
+                    'data' => null,
+                    'message' => $sslcz['failedreason'] ?? 'Invalid response from SSLCommerz.',
+                ]);
             }
 
             if ($pattern == 'json') {

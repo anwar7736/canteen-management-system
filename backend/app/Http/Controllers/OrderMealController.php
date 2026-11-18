@@ -14,31 +14,33 @@ class OrderMealController extends Controller
 
     public function CountSummary($token_no)
     {
-        
-        $first_day = date('Y-m-d', strtotime('first day of this month'));
-        $last_day = date('Y-m-d', strtotime('last day of this month'));
+        $now = now('Asia/Dhaka');
+        $first_day = $now->copy()->startOfMonth()->toDateString();
+        $last_day = $now->copy()->endOfMonth()->toDateString();
 
         $meal_rate = MealRate::select('lunch_rate', 'dinner_rate')->first();
-        $total_lunch = OrderMeal::where('token_no', $token_no)
-                            ->whereBetween('meal_given_date', [$first_day, $last_day])
-                            ->sum('lunch');
+        $order_summary = OrderMeal::where('token_no', $token_no)
+            ->whereBetween('meal_given_date', [$first_day, $last_day])
+            ->selectRaw(
+                'COALESCE(SUM(lunch), 0) as total_lunch,
+                 COALESCE(SUM(dinner), 0) as total_dinner,
+                 COALESCE(SUM(delivery_charge), 0) as total_delivery_cost'
+            )
+            ->first();
+        $total_lunch = $order_summary->total_lunch;
         $lunch_cost = $meal_rate->lunch_rate * $total_lunch;
-
-        $total_dinner = OrderMeal::where('token_no', $token_no)
-                            ->whereBetween('meal_given_date', [$first_day, $last_day])
-                            ->sum('dinner'); 
-        $total_delivery_cost = OrderMeal::where('token_no', $token_no)
-                            ->whereBetween('meal_given_date', [$first_day, $last_day])
-                            ->sum('delivery_charge');
+        $total_dinner = $order_summary->total_dinner;
+        $total_delivery_cost = $order_summary->total_delivery_cost;
         $dinner_cost = $meal_rate->dinner_rate * $total_dinner;
 
         $total_meal = $total_lunch + $total_dinner;
 
         $total_cost = $lunch_cost +  $dinner_cost + $total_delivery_cost;
 
-        $total_payment = Payment::where('token_no', $token_no)
-                                ->whereBetween('payment_date', [$first_day, $last_day])
-                                ->sum('amount');
+        $total_payment = Payment::settled()
+            ->where('token_no', (string) $token_no)
+            ->whereBetween('payment_date', [$first_day, $last_day])
+            ->sum('amount');
 
         $give_take = $total_cost - $total_payment;
 
@@ -55,12 +57,12 @@ class OrderMealController extends Controller
             $give = $give_take;
         }
 
-        $year = date('Y');
+        $year = $now->year;
         $months = ["January", "February", "March", 
         "April", "May", "June", 
         "July", "August", "September", 
         "October", "November", "December"];
-        $month = $months[date('m')-1];
+        $month = $months[$now->month - 1];
         return array(
             "total_lunch" => $total_lunch, 
             "lunch_cost" => $lunch_cost,  
@@ -87,9 +89,7 @@ class OrderMealController extends Controller
         $user = User::where('token_no', $token_no)->first();
         $user_id = $user->id;
 
-        date_default_timezone_set("Asia/Dhaka");
-
-        $meal_given_date =  date("Y-m-d", strtotime("+1 day"));
+        $meal_given_date = now('Asia/Dhaka')->addDay()->toDateString();
 
         $meal_rates    =  MealRate::first();
         $lunch_rate    =  $meal_rates->lunch_rate;
@@ -187,8 +187,7 @@ class OrderMealController extends Controller
     {
         $user_id = $req->user_id;
         $token_no = $req->token_no;
-        date_default_timezone_set("Asia/Dhaka");
-        $meal_given_date =  date("Y-m-d", strtotime("+1 day"));
+        $meal_given_date = now('Asia/Dhaka')->addDay()->toDateString();
         $today_order_info = OrderMeal::where([
             'user_id'=>$user_id, 
             'token_no'=>$token_no, 
@@ -201,8 +200,7 @@ class OrderMealController extends Controller
     public function GetTodayOrderInfoByOrderId(Request $req)
     {
         $order_id = $req->order_id;
-        date_default_timezone_set("Asia/Dhaka");
-        $meal_given_date =  date("Y-m-d", strtotime("+1 day"));
+        $meal_given_date = now('Asia/Dhaka')->addDay()->toDateString();
         $today_order_info = OrderMeal::where([
             'id'=>$order_id, 
             'meal_given_date'=> $meal_given_date
@@ -214,8 +212,7 @@ class OrderMealController extends Controller
 
     public function GetTodayAllOrderInfo(Request $req)
     {
-        date_default_timezone_set("Asia/Dhaka");
-        $meal_given_date =  date("Y-m-d", strtotime("+1 day"));
+        $meal_given_date = now('Asia/Dhaka')->addDay()->toDateString();
         $today_order_info = OrderMeal::where([
             'meal_given_date'=> $meal_given_date
             ])->get();

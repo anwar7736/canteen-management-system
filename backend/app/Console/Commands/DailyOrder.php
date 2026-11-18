@@ -6,7 +6,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\OrderReminder;
 use App\Models\User;
-use App\Models\OrderMeal;
 
 class DailyOrder extends Command
 {
@@ -22,17 +21,21 @@ class DailyOrder extends Command
 
     public function handle()
     {
-        $users = User::where('role', 'user')->get();
-        foreach($users as $user)
-        {
-            $date = date('Y-m-d', strtotime('+1 day'));
-            $token_no = $user->token_no;
-            $isExist = OrderMeal::where(['token_no'=>$token_no,'meal_given_date'=>$date])->count();
-            if($isExist===0)
-            {
-                Notification::send($user, new OrderReminder($user->name));
-            }
-        }
+        $date = now('Asia/Dhaka')->addDay()->toDateString();
+
+        User::where('role', 'user')
+            ->whereNotExists(function ($query) use ($date) {
+                $query->selectRaw('1')
+                    ->from('order_meals')
+                    ->whereColumn('order_meals.token_no', 'users.token_no')
+                    ->where('order_meals.meal_given_date', $date)
+                    ->whereNull('order_meals.deleted_at');
+            })
+            ->chunkById(500, function ($users) {
+                foreach ($users as $user) {
+                    Notification::send($user, new OrderReminder($user->name));
+                }
+            });
 
     }
 }

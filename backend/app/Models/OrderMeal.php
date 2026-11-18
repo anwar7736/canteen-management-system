@@ -11,4 +11,8 @@ class OrderMeal extends Model
     use HasFactory;
     use SoftDeletes;
     protected $dates = ['created_at', 'updated_at', 'deleted_at'];
+
+    protected $casts = [
+        'delivery_charge' => 'float',
+    ];
 }

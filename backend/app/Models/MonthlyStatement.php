@@ -9,4 +9,10 @@ class MonthlyStatement extends Model
 {
     use HasFactory;
     public $timestamps = false;
+
+    protected $casts = [
+        'total_payment' => 'float',
+        'give' => 'float',
+        'take' => 'float',
+    ];
 }

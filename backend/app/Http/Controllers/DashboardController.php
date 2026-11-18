@@ -39,8 +39,9 @@ class DashboardController extends Controller
         $total_bazar_cost = DailyBazarCost::whereBetween('date', [$first_day, $last_day])
                                             ->sum('amount'); 
 
-        $total_payments = Payment::whereBetween('payment_date', [$first_day, $last_day])
-                                            ->sum('amount');
+        $total_payments = Payment::settled()
+            ->whereBetween('payment_date', [$first_day, $last_day])
+            ->sum('amount');
 
         $statement_summary = MonthlyStatement::selectRaw(
             'COALESCE(SUM(take), 0) as total_due, COALESCE(SUM(give), 0) as total_user_due'
@@ -93,7 +94,8 @@ class DashboardController extends Controller
 
         $total_sending_message = Notification::where('author_id', $user_id)->count();
 
-        $total_payment = Payment::where('token_no', $user->token_no)
+        $total_payment = Payment::settled()
+            ->where('token_no', $user->token_no)
             ->whereBetween('payment_date', [$first_day, $last_day])
             ->sum('amount');
 
