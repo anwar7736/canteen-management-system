@@ -1,7 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import SideBar from '../components/SideBar';
 import Axios from "axios";
-import { ToastContainer, toast } from 'react-toastify';
 import {Navigate} from 'react-router-dom';
 import API from './../api/api';
 

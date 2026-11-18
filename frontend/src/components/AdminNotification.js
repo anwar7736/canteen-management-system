@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Navigate} from 'react-router-dom';
 import Axios from 'axios';

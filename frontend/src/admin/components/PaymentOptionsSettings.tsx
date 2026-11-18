@@ -7,21 +7,35 @@ import {
   savePaymentOptions,
   type PaymentOptions,
 } from '../../lib/payment-options';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 export default function PaymentOptionsSettings() {
   const [settings, setSettings] = useState<PaymentOptions>(DEFAULT_PAYMENT_OPTIONS);
+  const [errors, setErrors] = useState<{ qrPayload?: string; manualAccount?: string }>({});
 
   useEffect(() => setSettings(readPaymentOptions()), []);
 
   const update = (field: keyof PaymentOptions, value: string | boolean) => {
     setSettings((current) => ({ ...current, [field]: value }));
+    if (field === 'qrPayload' || field === 'manualAccount') {
+      setErrors((current) => ({ ...current, [field]: '' }));
+    }
   };
 
   const save = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const nextErrors: typeof errors = {};
+    if (settings.qrEnabled && !settings.qrPayload.trim()) {
+      nextErrors.qrPayload = 'Enter a QR payment link or payload.';
+    }
+    if (settings.manualEnabled && !settings.manualAccount.trim()) {
+      nextErrors.manualAccount = 'Enter the payment account or mobile number.';
+    }
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     savePaymentOptions(settings);
-    toast.success('Payment options saved on this device.', { containerId: 'app' });
+    toast.success('Payment options saved on this device.');
   };
 
   return (
@@ -52,10 +66,12 @@ export default function PaymentOptionsSettings() {
             id="payment-qr-payload"
             value={settings.qrPayload}
             onChange={(event) => update('qrPayload', event.target.value)}
-            className="form-control"
+            className={`form-control ${errors.qrPayload ? 'is-invalid' : ''}`}
+            aria-invalid={Boolean(errors.qrPayload)}
             maxLength={1000}
             placeholder="https://..."
           />
+          {errors.qrPayload && <p className="field-error" role="alert">{errors.qrPayload}</p>}
           <p className="mt-1 text-xs text-[var(--text-secondary)]">The QR encodes this text. Do not enter secret credentials.</p>
         </div>
         <label className="flex items-start gap-3 rounded-xl border border-[var(--border)] p-4">
@@ -76,10 +92,12 @@ export default function PaymentOptionsSettings() {
             id="manual-payment-account"
             value={settings.manualAccount}
             onChange={(event) => update('manualAccount', event.target.value)}
-            className="form-control"
+            className={`form-control ${errors.manualAccount ? 'is-invalid' : ''}`}
+            aria-invalid={Boolean(errors.manualAccount)}
             maxLength={100}
             placeholder="Enter the demo payment account"
           />
+          {errors.manualAccount && <p className="field-error" role="alert">{errors.manualAccount}</p>}
         </div>
         <div>
           <label htmlFor="manual-payment-instructions" className="mb-2 block text-sm font-semibold">Payment instructions</label>

@@ -1,10 +1,11 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Container, Form} from 'react-bootstrap';
 import SideBar from '../components/SideBar';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import {Link} from "react-router-dom";
 import {Navigate} from 'react-router-dom';
 import {getSession, signIn} from 'next-auth/react';
+import PasswordField from '../../components/PasswordField';
 
 
 
@@ -95,7 +96,7 @@ class LoginPage extends Component {
 
                                     <Form.Group className="mb-3" controlId="formBasicPassword">
                                     <Form.Label>Password</Form.Label>
-                                        <Form.Control value={password} autoComplete="current-password" aria-invalid={Boolean(errors.password)} className={errors.password ? 'is-invalid' : ''} onChange={(e)=>{this.setState({password : e.target.value, errors: {...errors, password: ''}})}} type="password" placeholder="Enter your password" />
+                                        <PasswordField value={password} autoComplete="current-password" aria-invalid={Boolean(errors.password)} className={errors.password ? 'is-invalid' : ''} onChange={(e)=>{this.setState({password : e.target.value, errors: {...errors, password: ''}})}} placeholder="Enter your password" />
                                         {errors.password && <div className="field-error" role="alert">{errors.password}</div>}
                                     </Form.Group> 
                                     <Button className="btn form-control mb-2" variant="success" type="submit" disabled={isDisabled}>

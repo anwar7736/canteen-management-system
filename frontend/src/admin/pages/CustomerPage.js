@@ -3,11 +3,13 @@ import {Button, Modal, Form, Container} from 'react-bootstrap';
 import SideBar from '../components/SideBar';
 import DataTable from 'react-data-table-component';
 import Axios from 'axios';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import { Navigate } from 'react-router-dom';
 import API from './../api/api';
 import confirmAction from '../../utils/confirmAction';
 import Select2Field from '../../components/Select2Field';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
+import PasswordField from '../../components/PasswordField';
 class CustomerPage extends Component {
 	constructor(){
 		super()
@@ -33,6 +35,8 @@ class CustomerPage extends Component {
             redirectStatus : false,
             mainDiv : '',
             token_view : 'd-none',
+            errors : {},
+            formError : '',
 		}
 	}
 	componentDidMount(){
@@ -68,6 +72,8 @@ class CustomerPage extends Component {
             address : '',
             status : 'active',
             role : 'user',
+            errors : {},
+            formError : '',
         });
     }
 
@@ -122,162 +128,63 @@ class CustomerPage extends Component {
 	}
 
     onPhotoChange=(event)=>{
-        this.setState({picture:event.target.files[0]})
+        this.setState({picture:event.target.files[0], errors: {...this.state.errors, picture: ''}, formError: ''})
     }
 
     SubmitForm=(event)=>{
         event.preventDefault();
-        const {action, name, username, password, token_no, email, phone, role, status, address, picture, previewImg} = this.state;
-        if(action==='Insert')
-        {
-            if(name=='')
-            {
-                cogoToast.warn('Name field is required!');
-            }
-            else if(username=='')
-            {
-                cogoToast.warn('Username field is required!');
-            }
-            else if(password=='')
-            {
-                cogoToast.warn('Password field is required!');
-            } 
-            else if(password.length < 8)
-            {
-                cogoToast.warn('Password must be at least 8 characters long.');
-            }
-            else if(email=='')
-            {
-                cogoToast.warn('Email field is required!');
-            }
-            else if(phone=='')
-            {
-                cogoToast.warn('Phone field is required!');
-            }
-            else if(address=='')
-            {
-                cogoToast.warn('Address field is required!');
-            }
-            else{
-            this.setState({submitBtnText:'Submitting...'});
-            let myFormData = new FormData();
-            myFormData.append('name', name);
-            myFormData.append('username', username);
-            myFormData.append('password', password);
-            myFormData.append('email', email);
-            myFormData.append('phone', phone);
-            myFormData.append('photo', picture);
-            myFormData.append('address', address);
-            myFormData.append('role', role);
-            myFormData.append('status', status);
-            Axios.post(API.AddMember,myFormData)
-                .then(response=>{
-                    if(response.status==200)
-                    {
-                        this.setState({submitBtnText:'Submitted'});
-                        if(response.data==1)
-                        {
-                            setTimeout(()=>{
-                                this.setState({submitBtnText:'Submit'});
-                                this.resetForm();
-                                this.modalClose();
-                                this.componentDidMount();
-                                cogoToast.success('Member has been inserted');
+    const {action, name, username, password, token_no, email, phone, role, status, address, picture} = this.state;
+    const errors = {};
+    if (!name.trim()) errors.name = 'Enter the member name.';
+    if (!username.trim()) errors.username = 'Enter a username.';
+    if (action === 'Insert' && !password) errors.password = 'Enter a password.';
+    else if (password && password.length < 8) errors.password = 'Password must be at least 8 characters.';
+    if (!email.trim()) errors.email = 'Enter an email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+    if (!phone.trim()) errors.phone = 'Enter a phone number.';
+    if (!address.trim()) errors.address = 'Enter an address.';
+    this.setState({errors, formError: ''});
+    if (Object.keys(errors).length) return;
 
-                            },1000);
-
-                        }
-                         else{
-                          this.setState({submitBtnText:'Submit'});
-                          cogoToast.error('Something went wrong!');
-                    }
-                    }
-                })
-                .catch(error=>{
-                    this.setState({submitBtnText:'Error'});
-                    cogoToast.error('Something went wrong!');
-                })
-            }
-    }
-
-    else if(action==='Update')
-    {
-      if(name=='')
-        {
-            cogoToast.warn('Name field is required!');
-        }
-        else if(username=='')
-        {
-            cogoToast.warn('Username field is required!');
-        }
-        else if(password && password.length < 8)
-        {
-            cogoToast.warn('Password must be at least 8 characters long.');
-        }
-        else if(email=='')
-        {
-            cogoToast.warn('Email field is required!');
-        }
-        else if(phone=='')
-        {
-            cogoToast.warn('Phone field is required!');
-        }
-        else if(address=='')
-        {
-            cogoToast.warn('Address field is required!');
-        }
-
-    else{
-    this.setState({submitBtnText:'Updating...'});
-     const id = this.state.selectedID;
-    let myFormData = new FormData();
-        myFormData.append('id', id);
-        myFormData.append('name', name);
-        myFormData.append('username', username);
-        if (password) myFormData.append('password', password);
-        myFormData.append('email', email);
-        myFormData.append('phone', phone);
-        myFormData.append('photo', picture);
-        myFormData.append('address', address);
-        myFormData.append('role', role);
-        myFormData.append('status', status);
+    const isInsert = action === 'Insert';
+    this.setState({submitBtnText: isInsert ? 'Submitting...' : 'Updating...'});
+    const myFormData = new FormData();
+    if (!isInsert) {
+        myFormData.append('id', this.state.selectedID);
         myFormData.append('token_no', token_no);
+    }
+    myFormData.append('name', name);
+    myFormData.append('username', username);
+    if (password) myFormData.append('password', password);
+    myFormData.append('email', email);
+    myFormData.append('phone', phone);
+    myFormData.append('photo', picture || '');
+    myFormData.append('address', address);
+    myFormData.append('role', role);
+    myFormData.append('status', status);
 
-    Axios.post(API.EditMember,myFormData)
-        .then(response=>{
-            if(response.status==200)
-            {
-                this.setState({submitBtnText:'Updated'});
-                if(response.data==1)
-                {
-                    setTimeout(()=>{
-                        this.setState({submitBtnText:'Update'});
-                        this.resetForm();
-                        this.modalClose();
-                        this.componentDidMount();
-                        cogoToast.success('Member has been updated');
-
-                    },1000);
-
-                }
-                else
-                {
-                        setTimeout(()=>{
-                        this.setState({submitBtnText:'Update'});
-                        cogoToast.info(response.data);
-
-                    },1000);
-
-                }
+    Axios.post(isInsert ? API.AddMember : API.EditMember, myFormData)
+        .then(response => {
+            if (response.status === 200 && response.data == 1) {
+                cogoToast.success(isInsert ? 'Member has been inserted' : 'Member has been updated');
+                this.resetForm();
+                this.modalClose();
+                this.componentDidMount();
+            } else {
+                this.setState({
+                    submitBtnText: isInsert ? 'Submit' : 'Update',
+                    formError: typeof response.data === 'string' ? response.data : 'The member could not be saved.',
+                });
             }
         })
-        .catch(error=>{
-            this.setState({submitBtnText:'Error'});
-            cogoToast.error('Something went wrong!');
-        })
-    }
-
-    }
+        .catch(error => {
+            const fieldErrors = getFieldErrors(error);
+            this.setState({
+                submitBtnText: isInsert ? 'Submit' : 'Update',
+                errors: fieldErrors,
+                formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+            });
+        });
 }
 	onDelete=async()=>{
         const id = this.state.selectedID;
@@ -387,27 +294,33 @@ class CustomerPage extends Component {
                             <Form onSubmit={this.SubmitForm}>
                                 <Form.Group >
                                     <Form.Label>Name </Form.Label>
-                                    <Form.Control value={name} onChange={(e)=>this.setState({name : e.target.value})} type="text" placeholder="Member Name..." />
+                                    <Form.Control value={name} isInvalid={Boolean(this.state.errors.name)} aria-invalid={Boolean(this.state.errors.name)} onChange={(e)=>this.setState({name : e.target.value, errors: {...this.state.errors, name: ''}, formError: ''})} type="text" placeholder="Member Name..." />
+                                    {this.state.errors.name && <Form.Control.Feedback type="invalid">{this.state.errors.name}</Form.Control.Feedback>}
                                 </Form.Group>
                                 <Form.Group className={previewImg}>
                                     <Form.Label>Token No. </Form.Label>
-                                    <Form.Control value={token_no} onChange={(e)=>this.setState({token_no : e.target.value})} type="text" placeholder="Member Token No...." />
+                                    <Form.Control value={token_no} isInvalid={Boolean(this.state.errors.token_no)} aria-invalid={Boolean(this.state.errors.token_no)} onChange={(e)=>this.setState({token_no : e.target.value, errors: {...this.state.errors, token_no: ''}, formError: ''})} type="text" placeholder="Member Token No...." />
+                                    {this.state.errors.token_no && <Form.Control.Feedback type="invalid">{this.state.errors.token_no}</Form.Control.Feedback>}
                                 </Form.Group>
                                 <Form.Group >
                                     <Form.Label>Username</Form.Label>
-                                    <Form.Control  value={username} onChange={(e)=>this.setState({username : e.target.value})} type="text" placeholder="Member Username..." />
+                                    <Form.Control value={username} isInvalid={Boolean(this.state.errors.username)} aria-invalid={Boolean(this.state.errors.username)} onChange={(e)=>this.setState({username : e.target.value, errors: {...this.state.errors, username: ''}, formError: ''})} type="text" placeholder="Member Username..." />
+                                    {this.state.errors.username && <Form.Control.Feedback type="invalid">{this.state.errors.username}</Form.Control.Feedback>}
                                 </Form.Group>
                                 <Form.Group >
                                     <Form.Label>Password</Form.Label>
-                                    <Form.Control value={password} onChange={(e)=>this.setState({password : e.target.value})} type="password" placeholder={this.state.action === 'Update' ? 'Leave blank to keep current password' : 'At least 8 characters'} autoComplete="new-password" />
+                                    <PasswordField value={password} isInvalid={Boolean(this.state.errors.password)} aria-invalid={Boolean(this.state.errors.password)} onChange={(e)=>this.setState({password : e.target.value, errors: {...this.state.errors, password: ''}, formError: ''})} placeholder={this.state.action === 'Update' ? 'Leave blank to keep current password' : 'At least 8 characters'} autoComplete="new-password" />
+                                    {this.state.errors.password && <Form.Control.Feedback type="invalid">{this.state.errors.password}</Form.Control.Feedback>}
                                 </Form.Group>
                                 <Form.Group >
                                     <Form.Label>Email</Form.Label>
-                                    <Form.Control  value={email} onChange={(e)=>this.setState({email : e.target.value})} type="email" placeholder="Member Email..." />
+                                    <Form.Control value={email} isInvalid={Boolean(this.state.errors.email)} aria-invalid={Boolean(this.state.errors.email)} onChange={(e)=>this.setState({email : e.target.value, errors: {...this.state.errors, email: ''}, formError: ''})} type="email" placeholder="Member Email..." />
+                                    {this.state.errors.email && <Form.Control.Feedback type="invalid">{this.state.errors.email}</Form.Control.Feedback>}
                                 </Form.Group> 
                                 <Form.Group >
                                     <Form.Label>Phone</Form.Label>
-                                    <Form.Control  value={phone} onChange={(e)=>this.setState({phone : e.target.value})} type="text" placeholder="Member Phone Number..." />
+                                    <Form.Control value={phone} isInvalid={Boolean(this.state.errors.phone)} aria-invalid={Boolean(this.state.errors.phone)} onChange={(e)=>this.setState({phone : e.target.value, errors: {...this.state.errors, phone: ''}, formError: ''})} type="text" placeholder="Member Phone Number..." />
+                                    {this.state.errors.phone && <Form.Control.Feedback type="invalid">{this.state.errors.phone}</Form.Control.Feedback>}
                                 </Form.Group> 
                                 <Form.Group >
                                     <Form.Label>Role</Form.Label>
@@ -425,16 +338,19 @@ class CustomerPage extends Component {
                                 </Form.Group>
                                 <Form.Group className="mb-3" controlId="exampleForm.ControlTextarea1">
                                     <Form.Label>Address</Form.Label>
-                                    <Form.Control as="textarea" rows={2} value={address} onChange={(e)=>this.setState({address : e.target.value})}/>
+                                    <Form.Control as="textarea" rows={2} value={address} isInvalid={Boolean(this.state.errors.address)} aria-invalid={Boolean(this.state.errors.address)} onChange={(e)=>this.setState({address : e.target.value, errors: {...this.state.errors, address: ''}, formError: ''})}/>
+                                    {this.state.errors.address && <Form.Control.Feedback type="invalid">{this.state.errors.address}</Form.Control.Feedback>}
                                 </Form.Group>
 
                                 <Form.Group >
                                     <Form.Label>Profile Picture</Form.Label>
-                                    <Form.Control onChange={this.onPhotoChange} type="file" />
+                                    <Form.Control onChange={this.onPhotoChange} isInvalid={Boolean(this.state.errors.picture || this.state.errors.photo)} aria-invalid={Boolean(this.state.errors.picture || this.state.errors.photo)} type="file" />
+                                    {(this.state.errors.picture || this.state.errors.photo) && <Form.Control.Feedback type="invalid">{this.state.errors.picture || this.state.errors.photo}</Form.Control.Feedback>}
                                     <img className={previewImg + " mt-3"} src={photo} width="100" height="100"/>
                                 </Form.Group>
 
-                                <Button className="btn form-control mt-4" variant="info" type="submit">
+                                {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
+                                <Button disabled={this.state.submitBtnText === 'Submitting...' || this.state.submitBtnText === 'Updating...'} className="btn form-control mt-4" variant="info" type="submit">
                                     {this.state.submitBtnText}
                                 </Button>
 

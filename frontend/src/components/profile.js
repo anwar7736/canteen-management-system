@@ -3,8 +3,9 @@ import {Button, Card, Col, Container, Form, Row} from "react-bootstrap";
 import {Link} from 'react-router-dom';
 import API from '../api/API';
 import {Navigate} from 'react-router-dom';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import Axios from 'axios';
+import {getFieldErrors, getFormError} from '../utils/formValidation';
 
 class Profile extends Component {
        state = {
@@ -17,6 +18,8 @@ class Profile extends Component {
             address : '',
             previewImg : '',
             updateBtn : 'Update Profile',
+            errors : {},
+            formError : '',
         }
     componentDidMount(){
         let user_id= localStorage.getItem('id');
@@ -47,55 +50,21 @@ class Profile extends Component {
       let phone = this.state.phone;
       let photo = this.state.photo;
       let address = this.state.address;
-      let NameRegx=/^[A-Za-z\'\s\.\:\-]+$/;
-	    let UserNameRegx=/^[A-Za-z0-9\'\s\.\:\-]+$/;
-      let MobileRegx=/^(?:\+?88|0088)?01[15-9]\d{8}$/;
-      let EmailRegx= /^[a-zA-Z0-9_]+@+[a-zA-Z0-9]+.+[A-z]/;
+      const errors = {};
+      if (!name.trim()) errors.name = 'Enter your name.';
+      else if (!/^[A-Za-z'\s.:-]+$/.test(name)) errors.name = 'Enter a valid name.';
+      if (!username.trim()) errors.username = 'Enter your username.';
+      else if (username.length < 3) errors.username = 'Username must be at least 3 characters.';
+      else if (!/^[A-Za-z0-9'\s.:-]+$/.test(username)) errors.username = 'Enter a valid username.';
+      if (!email.trim()) errors.email = 'Enter your email address.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+      if (!phone.trim()) errors.phone = 'Enter your mobile number.';
+      else if (!/^(?:\+?88|0088)?01[15-9]\d{8}$/.test(phone)) errors.phone = 'Enter a valid mobile number.';
+      if (!address.trim()) errors.address = 'Enter your current address.';
+      this.setState({errors, formError: ''});
+      if (Object.keys(errors).length) return;
 
-       if(name.length===0)
-        {
-            cogoToast.error('Enter Your Name');
-        }
-        else if(!NameRegx.test(name))
-        {
-             cogoToast.error('Name is Invalid!');
-        } 
-        else if(username.length===0)
-        {
-            cogoToast.error('Enter Your Username');
-        }
-        else if(username.length < 3)
-        {
-            cogoToast.error('Username is Too Short!');
-        }
-        else if(!UserNameRegx.test(username))
-        {
-             cogoToast.error('Username is Invalid!');
-        }
-
-        else if(email.length===0)
-        {
-            cogoToast.error('Enter Your Valid Email Address');
-        }
-        else if(!EmailRegx.test(email))
-        {
-             cogoToast.error('Invalid Email Address!');
-        } 
-
-        else if(phone.length===0)
-        {
-            cogoToast.error('Enter Your Valid Mobile Number');
-        }
-        else if(!MobileRegx.test(phone))
-        {
-             cogoToast.error('Invalid Mobile Number!');
-        } 
-        else if(address.length===0)
-        {
-             cogoToast.error('Enter Your Current Address!');
-        }
-        else
-        {
+            this.setState({updateBtn: 'Updating...'});
             let MyForm = new FormData();
             MyForm.append('id', id);
             MyForm.append('name', name);
@@ -109,12 +78,12 @@ class Profile extends Component {
             .then(response=>{                
                 if(typeof response.data === 'string')
                 {
-                    cogoToast.error(response.data);
+                    this.setState({updateBtn: 'Update Profile', formError: response.data});
                 }
 
                 else if(response.status==200 && response.data!=0)
                 {
-                    this.setState({PageRefreshStatus:true})
+                    this.setState({PageRefreshStatus:true, updateBtn: 'Update Profile'})
                     cogoToast.success('Your profile updated successfully..');
                     // localStorage.removeItem('name');
                     // localStorage.removeItem('username');
@@ -127,14 +96,17 @@ class Profile extends Component {
 	                localStorage.setItem('photo', response.data['photo']);
                 }
                 else{
-                     cogoToast.warn("Profile Nothing to Changes");
+                    this.setState({updateBtn: 'Update Profile', formError: 'There are no profile changes to save.'});
                 }
             })
             .catch(error=>{
-                 cogoToast.error('Something Went Wrong!');
+                const fieldErrors = getFieldErrors(error);
+                this.setState({
+                    updateBtn: 'Update Profile',
+                    errors: fieldErrors,
+                    formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                });
             })
-        
-    }
 }
     PageRefresh=()=>{
         if(this.state.PageRefreshStatus===true){
@@ -152,19 +124,23 @@ class Profile extends Component {
                                 <h5 className="text-success text-center m-4"><b>YOUR PROFILE</b></h5><hr/>
                           <Form.Group controlId="formBasicPassword">
                             <Form.Label>Your Name</Form.Label>
-                            <Form.Control value={this.state.name} onChange={(e)=>this.setState({name:e.target.value})} type="text" placeholder="Enter your name" />
+                            <Form.Control value={this.state.name} isInvalid={Boolean(this.state.errors.name)} aria-invalid={Boolean(this.state.errors.name)} onChange={(e)=>this.setState({name:e.target.value, errors: {...this.state.errors, name: ''}, formError: ''})} type="text" placeholder="Enter your name" />
+                            {this.state.errors.name && <Form.Control.Feedback type="invalid">{this.state.errors.name}</Form.Control.Feedback>}
                           </Form.Group>
                           <Form.Group controlId="formBasicPassword">
                             <Form.Label>Your Username</Form.Label>
-                            <Form.Control value={this.state.username} onChange={(e)=>this.setState({username:e.target.value})} type="text" placeholder="Enter your username" />
+                            <Form.Control value={this.state.username} isInvalid={Boolean(this.state.errors.username)} aria-invalid={Boolean(this.state.errors.username)} onChange={(e)=>this.setState({username:e.target.value, errors: {...this.state.errors, username: ''}, formError: ''})} type="text" placeholder="Enter your username" />
+                            {this.state.errors.username && <Form.Control.Feedback type="invalid">{this.state.errors.username}</Form.Control.Feedback>}
                           </Form.Group>
                           <Form.Group controlId="formPassword">
                           <Form.Label>Your Email Address</Form.Label>
-                            <Form.Control value={this.state.email} onChange={(e)=>{this.setState({email:e.target.value})}} type="text" placeholder="Enter your valid email address..." />
+                            <Form.Control value={this.state.email} isInvalid={Boolean(this.state.errors.email)} aria-invalid={Boolean(this.state.errors.email)} onChange={(e)=>{this.setState({email:e.target.value, errors: {...this.state.errors, email: ''}, formError: ''})}} type="email" placeholder="Enter your valid email address..." />
+                            {this.state.errors.email && <Form.Control.Feedback type="invalid">{this.state.errors.email}</Form.Control.Feedback>}
                           </Form.Group>
                           <Form.Group controlId="formPassword">
                           <Form.Label>Your Mobile Number</Form.Label>
-                            <Form.Control maxLength="11" value={this.state.phone} onChange={(e)=>{this.setState({phone:e.target.value})}} type="text" placeholder="Enter your valid mobile number..." />
+                            <Form.Control maxLength="15" value={this.state.phone} isInvalid={Boolean(this.state.errors.phone)} aria-invalid={Boolean(this.state.errors.phone)} onChange={(e)=>{this.setState({phone:e.target.value, errors: {...this.state.errors, phone: ''}, formError: ''})}} type="text" placeholder="Enter your valid mobile number..." />
+                            {this.state.errors.phone && <Form.Control.Feedback type="invalid">{this.state.errors.phone}</Form.Control.Feedback>}
                           </Form.Group> 
                           <Form.Group controlId="formPassword">
                           <Form.Label>Your Profile Picture</Form.Label><br/>
@@ -175,12 +151,15 @@ class Profile extends Component {
                                     {this.state.name ? this.state.name.trim().charAt(0).toUpperCase() : 'M'}
                                 </div>
                             )}
-                            <Form.Control onChange={(e)=> this.setState({photo:e.target.files[0]})} type="file" placeholder="Re-type new password" />
+                            <Form.Control onChange={(e)=> this.setState({photo:e.target.files[0], errors: {...this.state.errors, photo: ''}, formError: ''})} isInvalid={Boolean(this.state.errors.photo)} aria-invalid={Boolean(this.state.errors.photo)} type="file" placeholder="Re-type new password" />
+                            {this.state.errors.photo && <Form.Control.Feedback type="invalid">{this.state.errors.photo}</Form.Control.Feedback>}
                           </Form.Group>
                           <Form.Group controlId="formPassword">
                           <Form.Label>Your Current Address</Form.Label>
-                            <Form.Control value={this.state.address} onChange={(e)=>{this.setState({address:e.target.value})}} type="text" placeholder="Enter your current location..." />
+                            <Form.Control value={this.state.address} isInvalid={Boolean(this.state.errors.address)} aria-invalid={Boolean(this.state.errors.address)} onChange={(e)=>{this.setState({address:e.target.value, errors: {...this.state.errors, address: ''}, formError: ''})}} type="text" placeholder="Enter your current location..." />
+                            {this.state.errors.address && <Form.Control.Feedback type="invalid">{this.state.errors.address}</Form.Control.Feedback>}
                           </Form.Group> 
+                          {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                           <Button disabled={this.state.isDisabled} variant="success" className="btn-block" type="submit">
                           {this.state.updateBtn}
                           </Button><br/><br/>

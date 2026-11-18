@@ -3,7 +3,7 @@ import NavBar from '../components/Navbar';
 import Footer from '../components/footer';
 import {Navigate} from 'react-router-dom';
 import {QRCodeSVG} from 'qrcode.react';
-import {toast} from 'react-toastify';
+import {toast} from 'sonner';
 import {
     DEFAULT_PAYMENT_OPTIONS,
     ONLINE_PAYMENT_URL,
@@ -41,10 +41,10 @@ class PaymentPage extends Component {
         if (!account) return;
         try {
             await navigator.clipboard.writeText(account);
-            toast.success('Payment details copied.', {containerId: 'app'});
+            toast.success('Payment details copied.');
         } catch (error) {
             console.error('Unable to copy payment details:', error);
-            toast.error('Clipboard access is unavailable in this browser.', {containerId: 'app'});
+            toast.error('Clipboard access is unavailable in this browser.');
         }
     };
 

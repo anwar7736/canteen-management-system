@@ -1,12 +1,10 @@
-import { toast } from 'react-toastify';
-
-const containerId = 'app';
+import { toast } from 'sonner';
 
 const cogoToast = {
-  success: (message) => toast.success(message, { containerId }),
-  error: (message) => toast.error(message, { containerId }),
-  warn: (message) => toast.warning(message, { containerId }),
-  info: (message) => toast.info(message, { containerId }),
+  success: (message) => toast.success(message),
+  error: (message) => toast.error(message),
+  warn: (message) => toast.warning(message),
+  info: (message) => toast.info(message),
 };
 
 export default cogoToast;

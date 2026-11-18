@@ -3,7 +3,6 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '../assets/css/globals.css';
 import '../assets/css/animate.min.css';
 import '../assets/css/fontawesome.css';
-import 'react-toastify/dist/ReactToastify.css';
 import 'react-quill-new/dist/quill.snow.css';
 import 'select2/dist/css/select2.min.css';
 import './globals.css';
@@ -13,6 +12,10 @@ export const metadata: Metadata = {
   title: 'Canteen Management',
   description: 'Canteen management system',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/canteen-icon.svg',
+    apple: '/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

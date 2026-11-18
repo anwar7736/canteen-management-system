@@ -1,10 +1,11 @@
 import React, {Component, Fragment} from 'react';
 import {Form, Button, Container, Row, Col} from 'react-bootstrap';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Link} from "react-router-dom";
 import {Navigate} from "react-router-dom";
 import Axios from 'axios';
+import {getFieldErrors, getFormError} from '../utils/formValidation';
 
 class OTP extends React.Component{
 	state = {
@@ -16,6 +17,8 @@ class OTP extends React.Component{
         isDisabled : true,
 		verifyBtn : 'Verify OTP',
 		count_down : '',
+		errors : {},
+		formError : '',
 	}
 componentDidMount(){
 	let email = localStorage.getItem('email_verified');
@@ -75,7 +78,11 @@ countDown=()=>{
 onChangeHandler=(e)=>
     {
         let otp = e.target.value;
-        this.setState({otp : otp});
+        this.setState({
+			otp,
+			errors: {...this.state.errors, otp: otp.length === 6 ? '' : (otp ? 'OTP must be 6 digits.' : '')},
+			formError: '',
+		});
         if(otp.length===6)
         {
             this.setState({isDisabled : false});
@@ -90,6 +97,10 @@ onChangeHandler=(e)=>
 
 OTPVerify=(e)=>{        
 	e.preventDefault();
+	if (!/^\d{6}$/.test(this.state.otp)) {
+		this.setState({errors: {...this.state.errors, otp: 'Enter the 6-digit OTP.'}});
+		return;
+	}
 	this.setState({verifyBtn : 'Verifying...'});
 	let email = this.state.email;
 	let otp = this.state.otp;
@@ -115,30 +126,20 @@ OTPVerify=(e)=>{
 		}
 		else
 		{	
-			this.setState({verifyBtn : 'Verify OTP', isDisabled : false});
-			cogoToast.error('Your OTP is not valid!');
+			this.setState({verifyBtn : 'Verify OTP', isDisabled : false, errors: {otp: 'Your OTP is not valid!'}});
 		}
 	})
 	.catch(error=>{
-		 
+		const fieldErrors = getFieldErrors(error);
+		this.setState({
+			verifyBtn: 'Verify OTP',
+			isDisabled: false,
+			errors: fieldErrors,
+			formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+		});
 	})
 
 	}
-passwordShowHide=()=>{
-	let input = document.getElementById("password");
-	let btnText = document.getElementById("showHideBtn");
-	if(input.type=="password")
-	{
-		input.type = "text";
-		btnText.innerHTML = '<i class="fa fa-eye-slash"/> Hide Password';
-	}
-	else
-	{
-		input.type = "password";
-		btnText.innerHTML = '<i class="fa fa-eye"/> Show Password';
-	}
-}
-
 onRedirectToResetPassword=()=>{
 	if(this.state.redirectStatus===true){
 			return (
@@ -165,12 +166,14 @@ onRedirectToEmailVerify=()=>{
 							 <p>We've already sent 6 digits OTP number in this email : {this.state.email}</p><hr/>
                              <p>This OTP will be expired within <span id="count_down" className="text-danger">{this.state.count_down}</span></p>
                              <hr/>
-						  <Form.Group controlId="formBasicEmail">
+						  <Form.Group className="mb-3" controlId="formBasicEmail">
 						    <Form.Label>Enter Valid OTP</Form.Label>
-						    <Form.Control value={this.state.otp} maxLength="6" onChange={this.onChangeHandler} type="text" placeholder="Enter your valid OTP number..." />
+						    <Form.Control value={this.state.otp} maxLength="6" isInvalid={Boolean(this.state.errors.otp)} aria-invalid={Boolean(this.state.errors.otp)} onChange={this.onChangeHandler} type="text" inputMode="numeric" placeholder="Enter your valid OTP number..." />
+							{this.state.errors.otp && <Form.Control.Feedback type="invalid">{this.state.errors.otp}</Form.Control.Feedback>}
 						    <Form.Text className="text-muted">
 						    </Form.Text>
 						  </Form.Group>
+						  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
 
 						  <Button disabled={this.state.isDisabled} variant="success" className="btn-block mb-2" type="submit">
 						    {this.state.verifyBtn}	

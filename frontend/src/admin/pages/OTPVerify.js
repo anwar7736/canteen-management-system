@@ -3,12 +3,12 @@ import Loading from '../components/loadingDiv';
 import Error from '../components/wentWrong';
 import {Button, Container, Form, Row, Col} from 'react-bootstrap';
 import SideBar from '../components/SideBar';
-import { ToastContainer, toast } from 'react-toastify';
 import Axios from 'axios';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import {Link} from "react-router-dom";
 import {Navigate} from 'react-router-dom';
 import API from './../api/api';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 
 class OTPVerify extends Component {
@@ -23,6 +23,8 @@ class OTPVerify extends Component {
             totalSec : 300,
             verifyBtn : 'Verify OTP',
             count_down : '',
+            errors : {},
+            formError : '',
 
 		}
 	}
@@ -93,7 +95,11 @@ class OTPVerify extends Component {
 
     OTPChange=(e)=>{
         let otp = e.target.value;
-        this.setState({otp : otp});
+        this.setState({
+            otp,
+            errors: {...this.state.errors, otp: otp.length === 6 ? '' : (otp ? 'OTP must be 6 digits.' : '')},
+            formError: '',
+        });
         if(otp.length===6)
         {
             this.setState({isDisabled:false});
@@ -107,6 +113,10 @@ class OTPVerify extends Component {
         e.preventDefault();
         var email = this.state.email;
         var otp = this.state.otp;
+        if (!/^\d{6}$/.test(otp || '')) {
+            this.setState({errors: {...this.state.errors, otp: 'Enter the 6-digit OTP.'}});
+            return;
+        }
 
             Axios.post(API.OTPVerification, {email:email, otp : otp})
             .then(response=>{
@@ -122,11 +132,15 @@ class OTPVerify extends Component {
                 }
                 else
                 {
-                    cogoToast.error('Invalid OTP Code!');
+                    this.setState({errors: {otp: 'Invalid OTP code.'}});
                 }
             })
             .catch(error=>{
-                cogoToast.error('Something went wrong!');
+                const fieldErrors = getFieldErrors(error);
+                this.setState({
+                    errors: fieldErrors,
+                    formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                });
             })
         }
     
@@ -168,8 +182,10 @@ class OTPVerify extends Component {
                                 <Form onSubmit={this.OTPVerify}>
                                     <Form.Group className="mb-3" controlId="formBasicEmail">
                                         <Form.Label>OTP Code</Form.Label>
-                                        <Form.Control type="text"  maxLength="6" onChange={this.OTPChange} placeholder="Enter Your Valid OTP Code...."/>
+                                        <Form.Control type="text" inputMode="numeric" maxLength="6" isInvalid={Boolean(this.state.errors.otp)} aria-invalid={Boolean(this.state.errors.otp)} onChange={this.OTPChange} placeholder="Enter Your Valid OTP Code...."/>
+                                        {this.state.errors.otp && <Form.Control.Feedback type="invalid">{this.state.errors.otp}</Form.Control.Feedback>}
                                     </Form.Group>
+                                    {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                                     <Button className="btn-block mb-2" variant="danger" type="submit" disabled={this.state.isDisabled}>
                                         NEXT
                                     </Button>

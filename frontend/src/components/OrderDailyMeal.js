@@ -5,7 +5,8 @@ import Axios from 'axios';
 import API from '../api/API';
 import confirmAction from '../utils/confirmAction';
 import {Navigate} from 'react-router-dom';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
+import {getFieldErrors, getFormError} from '../utils/formValidation';
 
 class UserList extends React.Component{
         state={
@@ -23,7 +24,9 @@ class UserList extends React.Component{
             btnText : 'Save Order',
             undoBtn : 'd-none',
             yes : false,
-            no  : true
+            no  : true,
+            errors : {},
+            formError : '',
 
         }
     componentDidMount(){
@@ -52,18 +55,22 @@ class UserList extends React.Component{
     onSubmitHandler=()=>
     {
         const {lunch, dinner, notes, editID, yes, user_id, token_no} = this.state;
-        if(lunch=='0'  && dinner=='0')
-        {
-            cogoToast.warn('Please choose your meal!')
-        }
-        else if(editID == ''){
+        const errors = {};
+        const lunchQuantity = Number(lunch);
+        const dinnerQuantity = Number(dinner);
+        if (lunchQuantity === 0 && dinnerQuantity === 0) errors.meal = 'Choose at least one meal quantity.';
+        if (!Number.isInteger(lunchQuantity) || lunchQuantity < 0 || lunchQuantity > 5) errors.lunch = 'Enter a whole number from 0 to 5.';
+        if (!Number.isInteger(dinnerQuantity) || dinnerQuantity < 0 || dinnerQuantity > 5) errors.dinner = 'Enter a whole number from 0 to 5.';
+        this.setState({errors, formError: ''});
+        if (Object.keys(errors).length) return;
+
+        if(editID == ''){
             let myOrder = new FormData();
             myOrder.append('token_no', token_no);
             myOrder.append('lunch', Number(lunch));
             myOrder.append('dinner', Number(dinner));
             myOrder.append('parcel', Number(yes));
             myOrder.append('notes', notes);
-            console.log(myOrder);
             Axios.post(API.OrderDailyMeal, myOrder)
             .then(response=>{
                     if(response.status==200 && response.data==1)
@@ -75,11 +82,15 @@ class UserList extends React.Component{
 
                     }
                     else{
-                         cogoToast.error(response.data);
+                         this.setState({formError: String(response.data)});
                     }
                  })
                  .catch(error=>{
-                    cogoToast.error('Something went wrong!');
+                    const fieldErrors = getFieldErrors(error);
+                    this.setState({
+                        errors: fieldErrors,
+                        formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                    });
                  })
         }
         else
@@ -107,13 +118,17 @@ class UserList extends React.Component{
                  })
                  .catch(error=>{
 
-                      cogoToast.error('Something went wrong!');
+                    const fieldErrors = getFieldErrors(error);
+                    this.setState({
+                        errors: fieldErrors,
+                        formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                    });
                  })
         
      }
     }
     resetForm=()=>{
-        this.setState({ lunch : '',dinner : '', yes : false, no : true, notes: '', btnText : 'Save Order', modalTitle : 'Order Today Meal', editID : '', deleteID : ''});
+        this.setState({ lunch : '', dinner : '', yes : false, no : true, notes: '', btnText : 'Save Order', modalTitle : 'Order Today Meal', editID : '', deleteID : '', errors: {}, formError: ''});
     }
 
     handleClose=()=>{
@@ -295,14 +310,20 @@ class UserList extends React.Component{
                         <input value={order_date} disabled className="form-control form-control-sm" type="text"/><br/>
                         <label className="form-label"><b>Enter Your Meal Quantity</b></label><br/>
                         <label className="form-label"><b>Lunch</b></label><br/>
-                        <input type="number" min="0" max="5" onChange={(e)=> {this.setState({lunch:e.target.value})}} value={lunch}/><br/>
+                        <input type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.lunch)} className={this.state.errors.lunch ? 'is-invalid' : ''} onChange={(e)=> {this.setState({lunch:e.target.value, errors: {...this.state.errors, lunch: '', meal: ''}, formError: ''})}} value={lunch}/>
+                        {this.state.errors.lunch && <p className="field-error" role="alert">{this.state.errors.lunch}</p>}
                         <label className="form-label"><b>Dinner</b></label><br/>
-                        <input type="number" min="0" max="5" onChange={(e)=> {this.setState({dinner:e.target.value})}} value={dinner}/><br/><br/>
+                        <input type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.dinner)} className={this.state.errors.dinner ? 'is-invalid' : ''} onChange={(e)=> {this.setState({dinner:e.target.value, errors: {...this.state.errors, dinner: '', meal: ''}, formError: ''})}} value={dinner}/>
+                        {this.state.errors.dinner && <p className="field-error" role="alert">{this.state.errors.dinner}</p>}
+                        {this.state.errors.meal && <p className="field-error" role="alert">{this.state.errors.meal}</p>}
+                        <br/>
                         <label className="form-label"><b>Do you want to take home delivery?</b></label><br/>
                         <label><input type="radio" name="parcel" onClick={(e)=>this.parcelStatus('Yes')} checked={yes}/> Yes</label><br/>
                         <label><input type="radio" name="parcel" onClick={(e)=>this.parcelStatus('No')} checked={no}/> No</label><br/>
                         <label className="form-label"><b>Add Notes (If Any)</b></label><br/>
-                        <textarea className="form-control form-control-sm" onChange={(e)=> {this.setState({notes:e.target.value})}} value={notes} placeholder="Enter your notes.."/>
+                        <textarea className={`form-control form-control-sm ${this.state.errors.notes ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.notes)} onChange={(e)=> {this.setState({notes:e.target.value, errors: {...this.state.errors, notes: ''}, formError: ''})}} value={notes} placeholder="Enter your notes.."/>
+                        {this.state.errors.notes && <p className="field-error" role="alert">{this.state.errors.notes}</p>}
+                        {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                     </Modal.Body>
                     <Modal.Footer>
                         <Button className="btn-sm btn-danger" onClick={this.handleClose}>

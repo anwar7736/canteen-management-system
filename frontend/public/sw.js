@@ -1,5 +1,12 @@
-const CACHE_NAME = 'canteen-shell-v1';
-const APP_SHELL = ['/manifest.json', '/offline.html', '/cms.webp', '/logo192.png', '/logo512.png'];
+const CACHE_NAME = 'canteen-shell-v2';
+const APP_SHELL = [
+  '/manifest.json',
+  '/offline.html',
+  '/canteen-icon.svg',
+  '/apple-touch-icon.png',
+  '/logo192.png',
+  '/logo512.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

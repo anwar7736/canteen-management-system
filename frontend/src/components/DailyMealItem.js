@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Form, Button, Container, Row, Col} from 'react-bootstrap';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Navigate} from 'react-router-dom';
 import {Link} from "react-router-dom";

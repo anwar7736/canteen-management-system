@@ -167,22 +167,55 @@ a:hover {
   color: var(--text-primary);
 }
 
-.auth-password {
+.password-visibility-field {
   position: relative;
 }
 
-.auth-password .form-control {
-  padding-right: 68px;
+.password-visibility-field .form-control {
+  padding-right: 3rem;
 }
 
-.auth-password-toggle {
+.password-visibility-field .form-control.is-invalid {
+  background-image: none;
+}
+
+.password-visibility-toggle {
   position: absolute;
-  inset: 0 10px 0 auto;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  transform: translateY(-50%);
+  place-items: center;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--accent-strong);
-  font-size: 12px;
-  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.password-visibility-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.password-visibility-toggle:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: -2px;
+}
+
+@media (max-width: 480px) {
+  .password-visibility-field .form-control {
+    padding-right: 2.9rem;
+  }
+
+  .password-visibility-toggle {
+    right: 2px;
+    width: 42px;
+    height: 42px;
+  }
 }
 
 .auth-remember {
@@ -1397,12 +1430,18 @@ a:focus-visible {
   .user-page-main {
     padding-right: 12px;
     padding-left: 12px;
+    padding-bottom: 96px;
   }
 
   .user-page-main > .footer {
-    padding-right: 190px !important;
+    padding-right: 8px !important;
     padding-left: 8px !important;
-    text-align: left;
+    text-align: center;
+  }
+
+  .user-page-main > .footer .product-name {
+    margin: 4px 0 0;
+    overflow-wrap: anywhere;
   }
 
   .token-page-heading {

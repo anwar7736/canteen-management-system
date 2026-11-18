@@ -33,9 +33,11 @@ function NavigationBar() {
         setDisplayName(localStorage.getItem('name') || 'Canteen user');
         setShopLogo(localStorage.getItem('shop_logo') || '');
 
-        Axios.get(`${API.CountLastest}/${userId}`)
-            .then((response) => setCountLatest(response.data))
-            .catch((error) => console.error('Unable to load notifications:', error));
+        if (userId) {
+            Axios.get(`${API.CountLastest}/${userId}`)
+                .then((response) => setCountLatest(response.data))
+                .catch((error) => console.error('Unable to load notifications:', error));
+        }
         Axios.get(API.GetShopLogo)
             .then((response) => {
                 const logo = response.data?.[0]?.shop_logo;
@@ -150,32 +152,36 @@ function NavigationBar() {
             />
             <header className="user-topbar">
                 <div className="flex min-w-0 items-center gap-3">
-                    <button
-                        type="button"
-                        className="user-sidebar-toggle"
-                        onClick={() => setSideNav(true)}
-                        aria-label="Open navigation"
-                    >
-                        <FontAwesomeIcon icon={faBars}/>
-                    </button>
+                    {login && (
+                        <button
+                            type="button"
+                            className="user-sidebar-toggle"
+                            onClick={() => setSideNav(true)}
+                            aria-label="Open navigation"
+                        >
+                            <FontAwesomeIcon icon={faBars}/>
+                        </button>
+                    )}
                     <div className="min-w-0">
                         <div className="topbar-shop">{localStorage.getItem('shop_name') || 'Canteen workspace'}</div>
                         <div className="topbar-caption">Welcome back, {displayName}</div>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link
-                        to="/admin_notification"
-                        className="relative grid h-10 w-10 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]"
-                        aria-label="Open notifications"
-                    >
-                        <FontAwesomeIcon icon={faBell}/>
-                        {Number(countLatest) > 0 && (
-                            <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] text-white">
-                                {countLatest}
-                            </span>
-                        )}
-                    </Link>
+                    {login && (
+                        <Link
+                            to="/admin_notification"
+                            className="relative grid h-10 w-10 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]"
+                            aria-label="Open notifications"
+                        >
+                            <FontAwesomeIcon icon={faBell}/>
+                            {Number(countLatest) > 0 && (
+                                <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-rose-500 px-1 text-center text-[10px] text-white">
+                                    {countLatest}
+                                </span>
+                            )}
+                        </Link>
+                    )}
                     {login && (
                         <Link to="/user_profile" className="hidden items-center gap-2 sm:flex">
                             <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">

@@ -1,11 +1,12 @@
 import React, {Component, Fragment} from 'react';
 import {Form, Button, Container} from 'react-bootstrap';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Link} from "react-router-dom";
 import {Navigate} from 'react-router-dom';
 import Axios from 'axios';
 import {getSession, signIn} from 'next-auth/react';
+import PasswordField from './PasswordField';
 
 class Login extends React.Component{
 		state = {
@@ -14,7 +15,6 @@ class Login extends React.Component{
 			isChecked : true,
 			redirectStatus : false,
 			isDisabled : false,
-			passwordVisible : false,
 			errors : {},
 		}
 	
@@ -81,8 +81,6 @@ Login=async (e)=>{
 		this.setState({isDisabled: false});
 	}
 }
-passwordShowHide=()=>this.setState((state)=>({passwordVisible: !state.passwordVisible}));
-
 RedirectToHomePage=()=>{
 	if(this.state.redirectStatus==true)
 	{
@@ -94,7 +92,7 @@ RedirectToHomePage=()=>{
 }
 
  render(){
-	const {errors, passwordVisible} = this.state;
+	const {errors} = this.state;
  	return(
  		<Fragment>
  			<Container className="login-page-card mt-4 col-lg-5 col-md-7 col-sm-10 col-xs-12 animated zoomIn">
@@ -109,12 +107,11 @@ RedirectToHomePage=()=>{
 						  </Form.Group>
 						  <Form.Group className="mt-3" controlId="formBasicPassword">
 						    <Form.Label>Password</Form.Label>
-						    <Form.Control aria-invalid={Boolean(errors.password)} className={errors.password ? 'is-invalid' : ''} value={this.state.password} onChange={(e)=>{this.setState({password:e.target.value, errors: {...this.state.errors, password: ''}})}} type={passwordVisible ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter password" id="password"/>
+						    <PasswordField aria-invalid={Boolean(errors.password)} className={errors.password ? 'is-invalid' : ''} value={this.state.password} onChange={(e)=>{this.setState({password:e.target.value, errors: {...this.state.errors, password: ''}})}} autoComplete="current-password" placeholder="Enter password" id="password"/>
 						    {errors.password && <div className="field-error" role="alert">{errors.password}</div>}
-						    <button id="showHideBtn" onClick={this.passwordShowHide} type="button" className="btn btn-link mt-1 p-0 text-sm text-emerald-700">{passwordVisible ? 'Hide password' : 'Show password'}</button>
 						  </Form.Group>
 						  <Form.Group className="my-3" controlId="formBasicCheckbox">
-							<Form.Check type="checkbox" onChange={this.RememberOnChange} checked={this.state.isChecked} className="text-primary" label="Remember username" />
+							<Form.Check type="checkbox" onChange={this.RememberOnChange} checked={this.state.isChecked} className="text-primary" label="Remember Me" />
 						   </Form.Group>
 						  <Button variant="success" className="mb-1 w-100" type="submit" disabled={this.state.isDisabled}>
 						    {this.state.isDisabled ? 'Signing in…' : 'Sign in'}

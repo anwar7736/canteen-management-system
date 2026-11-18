@@ -3,7 +3,7 @@ import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
 import DataTable from "react-data-table-component";
 import Axios from 'axios';
 import API from './../api/api';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import SideBar from '../components/SideBar';
 import Select2Field from '../../components/Select2Field';
 

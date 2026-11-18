@@ -1,10 +1,11 @@
 import React, {Component, Fragment} from 'react';
 import {Form, Button, Container, Row, Col} from 'react-bootstrap';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Link} from "react-router-dom";
 import {Navigate} from "react-router-dom";
 import Axios from 'axios';
+import {getFieldErrors, getFormError} from '../utils/formValidation';
 
 class Email extends React.Component{
 	constructor(){
@@ -16,23 +17,21 @@ class Email extends React.Component{
 			redirectStatus : false,
 			verifyBtn : 'Verify Email',
 			isDisabled : false,
+			errors : {},
+			formError : '',
 		}
 	}
 
 EmailVerify=(e)=>{
 	e.preventDefault();
-	let email = this.state.email;
-	let EmailRegx= /^[a-zA-Z0-9_]+@+[a-zA-Z0-9]+.+[A-z]/;
-	if(email=='')
-	{
-		 cogoToast.warn('Email Address Field is Required!');
-	}
-	else if(!EmailRegx.test(email))
-	{
-		cogoToast.error('Invalid Email Address!');
-	}
-	else{
-		this.setState({verifyBtn : 'Verifying....', isDisabled : true});
+	const email = this.state.email.trim();
+	const errors = {};
+	if (!email) errors.email = 'Enter your email address.';
+	else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
+	this.setState({errors, formError: ''});
+	if (Object.keys(errors).length) return;
+
+	this.setState({verifyBtn : 'Verifying....', isDisabled : true});
 		Axios.post(API.verifyEmail, {email:email})
                  .then(response=>{
                     if(response.status==200 && response.data=='1')
@@ -50,15 +49,21 @@ EmailVerify=(e)=>{
                     }
                    
                     else if(response.status==200 && response.data==='Email address does not exists.'){
-						this.setState({verifyBtn : 'Verify Email', isDisabled : true});
-						this.setState({email : ''});
-                         cogoToast.error(response.data);
+						this.setState({verifyBtn : 'Verify Email', isDisabled : false, errors: {email: response.data}});
                     }
+					else {
+						this.setState({verifyBtn: 'Verify Email', isDisabled: false, formError: getFormError({response: {data: response.data}})});
+					}
                  })
                  .catch(error=>{
-                    cogoToast.error('Something went wrong!');
+					const fieldErrors = getFieldErrors(error);
+					this.setState({
+						verifyBtn: 'Verify Email',
+						isDisabled: false,
+						errors: fieldErrors,
+						formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+					});
                  })
-	}
 }
 
 RedirectToOTPVerifyPage=()=>{
@@ -77,17 +82,19 @@ RedirectToOTPVerifyPage=()=>{
 					    <span id="count_down" className="d-none"></span>
  						<Form onSubmit={this.EmailVerify}>
  							<h2 className="text-center text-danger">Step 01 : Email Verification</h2>
-						  <Form.Group controlId="formBasicEmail">
+						  <Form.Group className="mb-3" controlId="formBasicEmail">
 						    <Form.Label>Enter Email Address</Form.Label>
-						    <Form.Control value={this.state.email} onChange={(e)=>{this.setState({email:e.target.value})}} type="text" placeholder="Enter email address..." />
+						    <Form.Control value={this.state.email} isInvalid={Boolean(this.state.errors.email)} aria-invalid={Boolean(this.state.errors.email)} onChange={(e)=>{this.setState({email:e.target.value, errors: {...this.state.errors, email: ''}, formError: ''})}} type="email" placeholder="Enter email address..." />
+							{this.state.errors.email && <Form.Control.Feedback type="invalid">{this.state.errors.email}</Form.Control.Feedback>}
 						    <Form.Text className="text-muted">
 						    </Form.Text>
 						  </Form.Group>
-						  <Button variant="success" disabled={this.state.isDisabled} className="btn-block mb-2" type="submit">
+						  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
+						  <Button variant="success" disabled={this.state.isDisabled} className="btn-block" type="submit">
 						   {this.state.verifyBtn}	
 						  </Button>
-						 	<Link to="/login">
-						    		<p className="forget-pass">Back to Login Page</p> 
+                            <Link to="/login">
+                                <p className="forget-pass">Back to Login</p>
 						    </Link>
 						   
 					</Form>

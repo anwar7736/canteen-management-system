@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
 
+const installedStorageKey = 'canteen-pwa-installed';
+
 export default function AppChrome() {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [installed, setInstalled] = useState<boolean | null>(null);
   const [dark, setDark] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -25,14 +27,25 @@ export default function AppChrome() {
     setDark(enabled);
     document.documentElement.classList.toggle('dark', enabled);
 
+    const isInstalled =
+      ['standalone', 'minimal-ui', 'fullscreen'].some((mode) =>
+        window.matchMedia(`(display-mode: ${mode})`).matches
+      ) ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      window.localStorage.getItem(installedStorageKey) === 'true';
+    setInstalled(isInstalled);
+
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault();
+      window.localStorage.removeItem(installedStorageKey);
+      setInstalled(false);
       setInstallPrompt(event as InstallPromptEvent);
     };
     const handleInstalled = () => {
+      window.localStorage.setItem(installedStorageKey, 'true');
       setInstalled(true);
       setInstallPrompt(null);
-      toast.success('Canteen Management is installed.', { containerId: 'app' });
+      toast.success('Canteen Management is installed.');
     };
 
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
@@ -59,16 +72,16 @@ export default function AppChrome() {
 
   const installApp = async () => {
     if (!installPrompt) {
-      toast.info(
-        'To install, use your browser menu and select “Install app” or “Add to Home Screen”.',
-        { containerId: 'app' }
-      );
+      toast.info('To install, use your browser menu and select “Install app” or “Add to Home Screen”.');
       return;
     }
 
     await installPrompt.prompt();
     const choice = await installPrompt.userChoice;
-    if (choice.outcome === 'accepted') setInstalled(true);
+    if (choice.outcome === 'accepted') {
+      window.localStorage.setItem(installedStorageKey, 'true');
+      setInstalled(true);
+    }
     setInstallPrompt(null);
   };
 
@@ -94,7 +107,7 @@ export default function AppChrome() {
       >
         {dark ? '☀' : '☾'}
       </button>
-      {!installed && (
+      {installed === false && (
         <button type="button" className="install-button" onClick={installApp}>
           <span aria-hidden="true">↓</span>
           <span>Install app</span>

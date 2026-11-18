@@ -3,10 +3,11 @@ import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
 import DataTable from "react-data-table-component";
 import Axios from 'axios';
 import API from './../api/api';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import {Navigate} from 'react-router-dom';
 import SideBar from '../components/SideBar';
 import confirmAction from '../../utils/confirmAction';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 
 class DailyBazar extends React.Component{
@@ -23,6 +24,10 @@ class DailyBazar extends React.Component{
             modalTitle : 'Add Bazar Cost',
             btnText : 'Save',
             redirectStatus : false,
+            errors : {},
+            formError : '',
+            filterErrors : {},
+            filterError : '',
         }
 
         componentDidMount=()=>{
@@ -42,35 +47,34 @@ class DailyBazar extends React.Component{
      }
 
        resetForm=()=>{
-            this.setState({from_date : '', to_date : ''});
+            this.setState({from_date : '', to_date : '', filterErrors: {}, filterError: ''});
             this.componentDidMount();
         }
 
         clearForm=()=>{
-            this.setState({modalTitle : 'Add Bazar Cost', btnText : 'Save', editID : '',  name : '', amount : ''});
+            this.setState({modalTitle : 'Add Bazar Cost', btnText : 'Save', editID : '', name : '', amount : '', errors: {}, formError: ''});
             this.componentDidMount();
         }
 
       filterByDate=()=>{
        const {token_no, from_date, to_date} = this.state;
 
-       if(from_date=='' || to_date=='')
-       {
-         cogoToast.warn('Both dates are required!');
-       }
-       else{
-            let myData = new FormData();
-            myData.append('from_date', from_date);
-            myData.append('to_date', to_date);
+       const filterErrors = {};
+       if (!from_date) filterErrors.from_date = 'Choose a start date.';
+       if (!to_date) filterErrors.to_date = 'Choose an end date.';
+       this.setState({filterErrors, filterError: ''});
+       if (Object.keys(filterErrors).length) return;
+       let myData = new FormData();
+       myData.append('from_date', from_date);
+       myData.append('to_date', to_date);
 
-          Axios.post(API.GetBazarCostByDate, myData)
+       Axios.post(API.GetBazarCostByDate, myData)
          .then(response=>{
              this.setState({dataTable : response.data});
          })
          .catch(error=>{
-           
-         })
-       }
+            this.setState({filterError: getFormError(error)});
+         });
      } 
 
     handleClose=()=>{
@@ -118,17 +122,13 @@ class DailyBazar extends React.Component{
 
     onSubmitHandler=()=>{
         const {editID, name, amount} = this.state;
-        if(name == "")
-        {
-            cogoToast.error('Name is Required!');
-        }
+      const errors = {};
+      if (!name.trim()) errors.name = 'Enter a name.';
+      if (!amount) errors.amount = 'Enter the bazar cost.';
+      this.setState({errors, formError: ''});
+      if (Object.keys(errors).length) return;
 
-        else if(amount == "")
-        {
-            cogoToast.error('Bazar Cost is Required!');
-        }
-
-        else{
+        this.setState({btnText: editID ? 'Updating...' : 'Saving...'});
           let formData = new FormData;
         formData.append("name", name);
         formData.append("amount", amount);
@@ -145,11 +145,16 @@ class DailyBazar extends React.Component{
                 }
 
                 else{
-                    cogoToast.error('Something went wrong!');
+                    this.setState({btnText: editID ? 'Update' : 'Save', formError: 'The bazar cost could not be saved.'});
                 }
             })
             .catch(error=>{
-                 cogoToast.error('Something went wrong!');
+                const fieldErrors = getFieldErrors(error);
+                this.setState({
+                    btnText: editID ? 'Update' : 'Save',
+                    errors: fieldErrors,
+                    formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                });
             })
         }
 
@@ -165,14 +170,18 @@ class DailyBazar extends React.Component{
                     }
 
                     else{
-                       cogoToast.error('Bazar cost will not be updated!');
+                        this.setState({btnText: 'Update', formError: 'The bazar cost could not be updated.'});
                     }
                 })
                 .catch(error=>{
-                     cogoToast.error('Something went wrong!');
+                    const fieldErrors = getFieldErrors(error);
+                    this.setState({
+                        btnText: 'Update',
+                        errors: fieldErrors,
+                        formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                    });
                 });
         }   
-        }
     }
 
     RedirectToLogin=()=>{
@@ -243,10 +252,13 @@ class DailyBazar extends React.Component{
                     <h3 className="heading-title text-danger text-center m-3">All Bazar Cost Statement</h3><hr/>
                     <div className="input-group row">
                         <div className="col-md-4 ">
-                          From : <input value={from_date} onChange={(e)=> {this.setState({from_date:e.target.value})}} className=" form-control form-control-sm mx-2" type="date"/>
+                          From : <input value={from_date} aria-invalid={Boolean(this.state.filterErrors.from_date)} onChange={(e)=> {this.setState({from_date:e.target.value, filterErrors: {...this.state.filterErrors, from_date: ''}})}} className={`form-control form-control-sm mx-2 ${this.state.filterErrors.from_date ? 'is-invalid' : ''}`} type="date"/>
+                          {this.state.filterErrors.from_date && <p className="field-error" role="alert">{this.state.filterErrors.from_date}</p>}
                         </div>
                         <div className="col-md-4 ">
-                          To : <input value={to_date} onChange={(e)=> {this.setState({to_date:e.target.value})}} className=" form-control form-control-sm mx-2" type="date"/>
+                          To : <input value={to_date} aria-invalid={Boolean(this.state.filterErrors.to_date)} onChange={(e)=> {this.setState({to_date:e.target.value, filterErrors: {...this.state.filterErrors, to_date: ''}})}} className={`form-control form-control-sm mx-2 ${this.state.filterErrors.to_date ? 'is-invalid' : ''}`} type="date"/>
+                          {this.state.filterErrors.to_date && <p className="field-error" role="alert">{this.state.filterErrors.to_date}</p>}
+                          {this.state.filterError && <p className="field-error" role="alert">{this.state.filterError}</p>}
                         </div>
                         <div className="col-md-4">
                           <button onClick={this.filterByDate} className="btn btn-sm btn-success mx-2 mt-4">Filter</button>
@@ -272,9 +284,12 @@ class DailyBazar extends React.Component{
                     </Modal.Header>
                     <Modal.Body>
                         <label className="form-label"><b>Name</b></label>
-                        <input value={name} onChange={(e)=> {this.setState({name:e.target.value})}} className="form-control form-control-sm" type="text" placeholder="Enter name..."/><br/>
+                        <input value={name} aria-invalid={Boolean(this.state.errors.name)} onChange={(e)=> {this.setState({name:e.target.value, errors: {...this.state.errors, name: ''}, formError: ''})}} className={`form-control form-control-sm ${this.state.errors.name ? 'is-invalid' : ''}`} type="text" placeholder="Enter name..."/>
+                        {this.state.errors.name && <p className="field-error" role="alert">{this.state.errors.name}</p>}
                              <label className="form-label"><b>Total Bazar Cost</b></label>
-                        <input value={amount} onChange={(e)=> {this.setState({amount:e.target.value})}} className="form-control form-control-sm" type="text" placeholder="Enter amount..."/><br/>
+                        <input value={amount} aria-invalid={Boolean(this.state.errors.amount)} onChange={(e)=> {this.setState({amount:e.target.value, errors: {...this.state.errors, amount: ''}, formError: ''})}} className={`form-control form-control-sm ${this.state.errors.amount ? 'is-invalid' : ''}`} type="number" min="0" step="0.01" placeholder="Enter amount..."/>
+                        {this.state.errors.amount && <p className="field-error" role="alert">{this.state.errors.amount}</p>}
+                        {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                     </Modal.Body>
                     <Modal.Footer>
                         <Button className="btn-sm btn-danger" onClick={this.handleClose}>

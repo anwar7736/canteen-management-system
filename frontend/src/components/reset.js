@@ -1,10 +1,12 @@
 import React, {Component, Fragment} from 'react';
 import {Form, Button, Container, Row, Col} from 'react-bootstrap';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../utils/cogoToast';
 import API from '../api/API';
 import {Link} from "react-router-dom";
 import {Navigate} from "react-router-dom";
 import Axios from 'axios';
+import {getFieldErrors, getFormError} from '../utils/formValidation';
+import PasswordField from './PasswordField';
 
 class Reset extends React.Component{
 	constructor(){
@@ -16,6 +18,8 @@ class Reset extends React.Component{
 			redirectStatus : false,
 			updateBtn : 'Update Password',
 			isDisabled : false,
+			errors : {},
+			formError : '',
 		}
 	}
 componentDidMount(){
@@ -29,31 +33,16 @@ componentDidMount(){
 
 ResetPassword=(e)=>{
 	e.preventDefault();
-	let email = this.state.email;
-	let new_pass = this.state.new_pass;
-	let confirm_pass = this.state.confirm_pass;
-	if(new_pass=='')
-	{
-		 cogoToast.warn('New Password Field is Required!')
-	}
+	const {email, new_pass, confirm_pass} = this.state;
+	const errors = {};
+	if (!new_pass) errors.new_pass = 'Enter a new password.';
+	else if (new_pass.length < 8) errors.new_pass = 'Password must be at least 8 characters.';
+	if (!confirm_pass) errors.confirm_pass = 'Confirm your new password.';
+	else if (new_pass !== confirm_pass) errors.confirm_pass = 'Passwords do not match.';
+	this.setState({errors, formError: ''});
+	if (Object.keys(errors).length) return;
 
-	else if(new_pass.length < 8)
-	{
-		cogoToast.warn('New Password must be at least 8 characters long.')
-	}
-
-	else if(confirm_pass=='')
-	{
-		 cogoToast.warn('Confirm Password Field is Required!')
-	}
-	
-	else if(new_pass!==confirm_pass)
-	{
-		cogoToast.warn('Both Password are Does Not Match!')
-	}
-
-	else{
-		this.setState({updateBtn : 'Updating...', isDisabled : true});
+	this.setState({updateBtn : 'Updating...', isDisabled : true});
 		Axios.post(API.ResetPassword, {
 			email,
 			password: new_pass,
@@ -77,30 +66,19 @@ ResetPassword=(e)=>{
 						}
                         else
 						{
-							this.setState({updateBtn : 'Update Password', isDisabled : false});
-                         	cogoToast.error(response.data);
+                        this.setState({updateBtn : 'Update Password', isDisabled : false, formError: String(response.data)});
 						}
                  })
                  .catch(error=>{
-                    cogoToast.error('Something went wrong!');
+					const fieldErrors = getFieldErrors(error, {password: 'new_pass', password_confirmation: 'confirm_pass'});
+					this.setState({
+                        updateBtn: 'Update Password',
+                        isDisabled: false,
+                        errors: fieldErrors,
+                        formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+					});
                  })
-	}
 }
-passwordShowHide=()=>{
-	let input = document.getElementById("password");
-	let btnText = document.getElementById("showHideBtn");
-	if(input.type=="password")
-	{
-		input.type = "text";
-		btnText.innerHTML = '<i class="fa fa-eye-slash"/> Hide Password';
-	}
-	else
-	{
-		input.type = "password";
-		btnText.innerHTML = '<i class="fa fa-eye"/> Show Password';
-	}
-}
-
 onRedirectToLoginPage=()=>{
 	if(this.state.redirectStatus===true){
 		return (
@@ -117,24 +95,27 @@ onRedirectToLoginPage=()=>{
 			 			<span id="count_down" className="d-none"></span>
  						<Form onSubmit={this.ResetPassword}>
  							<h2 className="text-center text-danger">Step 03 : Reset Password</h2>
-						  <Form.Group controlId="formBasicEmail">
+						  <Form.Group className="mb-3" controlId="formBasicEmail">
 						    <Form.Label>Your Email Address</Form.Label>
 						    <Form.Control value={this.state.email} disabled type="text" placeholder="example@gmail.com" />
 						  </Form.Group> 
-						  <Form.Group controlId="formBasicEmail">
+						  <Form.Group className="mb-3" controlId="formBasicEmail">
 						    <Form.Label>Enter New Password</Form.Label>
-						    <Form.Control value={this.state.new_pass} onChange={(e)=>{this.setState({new_pass:e.target.value})}} type="password" placeholder="Enter your new password..." />
+						    <PasswordField value={this.state.new_pass} isInvalid={Boolean(this.state.errors.new_pass)} aria-invalid={Boolean(this.state.errors.new_pass)} onChange={(e)=>{this.setState({new_pass:e.target.value, errors: {...this.state.errors, new_pass: '', confirm_pass: ''}, formError: ''})}} placeholder="Enter your new password..." />
+							{this.state.errors.new_pass && <Form.Control.Feedback type="invalid">{this.state.errors.new_pass}</Form.Control.Feedback>}
 						  </Form.Group>  
-						  <Form.Group controlId="formBasicEmail">
+						  <Form.Group className="mb-3" controlId="formBasicEmail">
 						    <Form.Label>Enter Confirm Password</Form.Label>
-						    <Form.Control value={this.state.confirm_pass} onChange={(e)=>{this.setState({confirm_pass:e.target.value})}} type="password" placeholder="Re-type your 	new password..." />
+						    <PasswordField value={this.state.confirm_pass} isInvalid={Boolean(this.state.errors.confirm_pass)} aria-invalid={Boolean(this.state.errors.confirm_pass)} onChange={(e)=>{this.setState({confirm_pass:e.target.value, errors: {...this.state.errors, confirm_pass: ''}, formError: ''})}} placeholder="Re-type your 	new password..." />
+							{this.state.errors.confirm_pass && <Form.Control.Feedback type="invalid">{this.state.errors.confirm_pass}</Form.Control.Feedback>}
 						  </Form.Group> 
+						  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
 
-						  <Button disabled={this.state.isDisabled} variant="success" className="btn-block mb-2" type="submit">
+						  <Button disabled={this.state.isDisabled} variant="success" className="btn-block mt-4 mb-2" type="submit">
 						    {this.state.updateBtn}
 						  </Button>
-						  	<Link to="/login">
-						    		<p className="forget-pass">Back to Login Page</p> 
+                            <Link to="/login">
+                                <p className="forget-pass">Back to Login</p>
 						    </Link>
 						   
 					</Form>

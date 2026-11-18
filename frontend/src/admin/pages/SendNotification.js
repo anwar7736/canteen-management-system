@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import API from './../api/api';
 import {Navigate} from 'react-router-dom';
 import {Link} from "react-router-dom";
@@ -8,6 +8,7 @@ import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import confirmAction from '../../utils/confirmAction';
 import DataTable from "react-data-table-component";
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 class SendNotification extends React.Component{
 	state = {
@@ -26,6 +27,8 @@ class SendNotification extends React.Component{
 		data : [],
 		show : false,
 		editID : '',
+		errors : {},
+		formError : '',
 	}
 
 	componentDidMount()
@@ -55,19 +58,12 @@ class SendNotification extends React.Component{
 		e.preventDefault();
 		const {author_id, author_name, msg_title, msg_body} = this.state;
 
-		if(author_name=='')
-		{
-			 cogoToast.error('Name field is required!')
-		}
-		else if(msg_title=='')
-		{
-			 cogoToast.error('Message title field is required!')
-		}
-		else if(msg_body=='')
-		{
-			 cogoToast.error('Message description field is required!')
-		}
-		else{
+		const errors = {};
+		if (!author_name.trim()) errors.author_name = 'Enter your name.';
+		if (!msg_title.trim()) errors.msg_title = 'Enter a message title.';
+		if (!msg_body.trim()) errors.msg_body = 'Enter your message.';
+		this.setState({errors, formError: ''});
+		if (Object.keys(errors).length) return;
 
 			this.setState({submitBtn : 'Submitting...', isDisabled : true});
 			let MyForm = new FormData();
@@ -92,43 +88,32 @@ class SendNotification extends React.Component{
 							this.setState({
 								submitBtn : 'Submit', 
 								isDisabled : false,
+								formError: 'The notification could not be sent. Please try again.',
 							});
-							this.clearForm();
-							cogoToast.error('Something went wrong!');
 	                   }
 	                 })
 	                 .catch(error=>{
-	                   cogoToast.error('Something went wrong!');
+						const fieldErrors = getFieldErrors(error);
+						this.setState({
+							submitBtn: 'Submit',
+							isDisabled: false,
+							errors: fieldErrors,
+							formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+						});
 	                 })
-			}
 	}
 
 	sendEmail=(e)=>{
 		e.preventDefault();
 
 		const {receivers, msg_title, msg_body, customChecked, allChecked} = this.state;
-		let EmailRegx= /^[a-zA-Z0-9_]+@+[a-zA-Z0-9]+.+[A-z]/;
-
-		if(msg_title=='')
-		{
-			 cogoToast.error('Message title field is required!')
-		}
-
-		else if(msg_body=='')
-		{
-			 cogoToast.error('Message description field is required!')
-		}
-
-		else if(customChecked && receivers.length==0)
-		{
-			 cogoToast.error('Receivers field is required!')
-		}
-
-		else if(customChecked && !EmailRegx.test(receivers))
-        {
-             cogoToast.error('Invalid Email Address!');
-        } 
-		else{
+		const errors = {};
+		if (!msg_title.trim()) errors.msg_title = 'Enter a message title.';
+		if (!msg_body.trim()) errors.msg_body = 'Enter your message.';
+		if (customChecked && !receivers.trim()) errors.receivers = 'Enter at least one recipient email.';
+		else if (customChecked && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receivers)) errors.receivers = 'Enter a valid email address.';
+		this.setState({errors, formError: ''});
+		if (Object.keys(errors).length) return;
 
 			let myForm = new FormData();
 		 	myForm.append('msg_title', msg_title);
@@ -152,15 +137,16 @@ class SendNotification extends React.Component{
 			 			this.clearForm();
 			 		}
 			 		else {
-			 			 cogoToast.error('Something went wrong!');
-			 			 this.clearForm();
+						this.setState({formError: 'The notification could not be sent. Please try again.'});
 			 		}
 			 	})
 			 	.catch(err=>{
-			 		 cogoToast.error('Something went wrong!');
+					const fieldErrors = getFieldErrors(err);
+					this.setState({
+						errors: fieldErrors,
+						formError: Object.keys(fieldErrors).length ? '' : getFormError(err),
+					});
 			 	})
-
-			}
 
 
 
@@ -210,7 +196,7 @@ handleClose=()=>{
 }
 
 clearForm=()=>{
-	this.setState({author_name : '', msg_title : '', msg_body : '', receivers : ''});
+	this.setState({author_name : '', msg_title : '', msg_body : '', receivers : '', errors: {}, formError: ''});
 }
 
 editIconOnClick=(id)=>{
@@ -249,16 +235,13 @@ deleteIconOnClick=(id)=>{
 
 EditNotification=()=>{
 	const{editID, author_name, msg_title, msg_body} = this.state;
-	if(msg_title=='')
-		{
-			 cogoToast.error('Message title field is required!')
-		}
+	const errors = {};
+	if (!author_name.trim()) errors.author_name = 'Enter the author name.';
+	if (!msg_title.trim()) errors.msg_title = 'Enter a message title.';
+	if (!msg_body.trim()) errors.msg_body = 'Enter your message.';
+	this.setState({errors, formError: ''});
+	if (Object.keys(errors).length) return;
 
-	else if(msg_body=='')
-	{
-		 cogoToast.error('Message description field is required!')
-	}
-	else {
 			let myForm = new FormData();
 			myForm.append('notify_id', editID);
 			myForm.append('author_name', author_name);
@@ -274,13 +257,16 @@ EditNotification=()=>{
 				this.componentDidMount();
 			}
 			else{
-				cogoToast.error('Something went wrong!');
+				this.setState({formError: 'The notification could not be updated. Please try again.'});
 			}
 		})
 		.catch(err=>{
-			cogoToast.error('Something went wrong!');
+			const fieldErrors = getFieldErrors(err);
+			this.setState({
+				errors: fieldErrors,
+				formError: Object.keys(fieldErrors).length ? '' : getFormError(err),
+			});
 		})
-	}
 }
 
  render(){
@@ -345,17 +331,21 @@ EditNotification=()=>{
 			   <form method="POST" onSubmit={this.SendMessage}>
 			      <div class="form-group">
 			        <label for="name">Your Name :</label>
-			        <input type="text" class="form-control" value={author_name} onChange={(e)=>this.setState({author_name:e.target.value})} placeholder="Enter your name..." id="name0"/>
+			        <input type="text" className={`form-control ${this.state.errors.author_name ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.author_name)} value={author_name} onChange={(e)=>this.setState({author_name:e.target.value, errors: {...this.state.errors, author_name: ''}, formError: ''})} placeholder="Enter your name..." id="name0"/>
+					{this.state.errors.author_name && <p className="field-error" role="alert">{this.state.errors.author_name}</p>}
 			      </div>
 			      <div class="form-group">
 			        <label for="title">Message Title :</label>
-			        <input type="text" class="form-control" value={msg_title}  onChange={(e)=>this.setState({msg_title:e.target.value})} placeholder="Enter message title..." id="title"/>
+			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
+					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
 			      </div>
 			      <div class="form-group">
 			        <label for="body">Message Body :</label>
-			        <textarea rows="5" class="form-control" value={msg_body}  onChange={(e)=>this.setState({msg_body:e.target.value})} id="body">
+			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
 			        </textarea>
+					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
 			      </div>
+				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
 			      <button type="submit" class="btn btn-success">Send</button>
 			   	  <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
 			    </form>   
@@ -386,13 +376,16 @@ EditNotification=()=>{
 			      */}
 			      <div class="form-group">
 			        <label for="title">Message Title :</label>
-			        <input type="text" class="form-control" value={msg_title}  onChange={(e)=>this.setState({msg_title:e.target.value})} placeholder="Enter message title..." id="title"/>
+			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
+					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
 			      </div>
 			      <div class="form-group">
 			        <label for="body">Message Body :</label>
-			        <textarea rows="5" class="form-control" value={msg_body}  onChange={(e)=>this.setState({msg_body:e.target.value})} id="body">
+			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
 			        </textarea>
+					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
 			      </div>
+				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
 			      <button type="submit" class="btn btn-success">Send</button>
 			      <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
 			    </form> 
@@ -420,13 +413,16 @@ EditNotification=()=>{
 			      */}
 			      <div class="form-group">
 			        <label for="title">Message Title :</label>
-			        <input type="text" class="form-control" value={msg_title}  onChange={(e)=>this.setState({msg_title:e.target.value})} placeholder="Enter message title..." id="title"/>
+			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
+					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
 			      </div>
 			      <div class="form-group">
 			        <label for="body">Message Body :</label>
-			        <textarea rows="5" class="form-control" value={msg_body}  onChange={(e)=>this.setState({msg_body:e.target.value})} id="body">
+			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
 			        </textarea>
+					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
 			      </div>
+				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
 			      <button type="submit" class="btn btn-success">Send</button>
 			      <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
 			    </form> 
@@ -451,11 +447,15 @@ EditNotification=()=>{
                     </Modal.Header>
                     <Modal.Body>
                         <label className="form-label"><b>Author Name</b></label>
-                        <input value={author_name} className="form-control onChange={(e)=>this.setState({author_name:e.target.value})} form-control-sm" type="text"/> <br/>
+                        <input value={author_name} aria-invalid={Boolean(this.state.errors.author_name)} onChange={(e)=>this.setState({author_name:e.target.value, errors: {...this.state.errors, author_name: ''}, formError: ''})} className={`form-control form-control-sm ${this.state.errors.author_name ? 'is-invalid' : ''}`} type="text"/>
+						{this.state.errors.author_name && <p className="field-error" role="alert">{this.state.errors.author_name}</p>}
                         <label className="form-label"><b>Message Title</b></label>
-                        <textarea value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value})} className="form-control form-control-sm" type="text"/><br/>
+                        <textarea value={msg_title} aria-invalid={Boolean(this.state.errors.msg_title)} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} className={`form-control form-control-sm ${this.state.errors.msg_title ? 'is-invalid' : ''}`} type="text"/>
+						{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
                          <label className="form-label"><b>Message Body</b></label>
-                        <textarea value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <textarea value={msg_body} aria-invalid={Boolean(this.state.errors.msg_body)} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} className={`form-control form-control-sm ${this.state.errors.msg_body ? 'is-invalid' : ''}`} type="text"/>
+						{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
+						{this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                         
                     </Modal.Body>
                     <Modal.Footer>

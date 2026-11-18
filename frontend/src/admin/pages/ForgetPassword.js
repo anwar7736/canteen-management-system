@@ -3,12 +3,13 @@ import Loading from '../components/loadingDiv';
 import Error from '../components/wentWrong';
 import {Button, Container, Form, Row, Col} from 'react-bootstrap';
 import SideBar from '../components/SideBar';
-import { ToastContainer, toast } from 'react-toastify';
 import Axios from 'axios';
-import cogoToast from 'cogo-toast';
+import cogoToast from '../../utils/cogoToast';
 import {Link} from "react-router-dom";
 import {Navigate} from 'react-router-dom';
 import API from './../api/api';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
+import PasswordField from '../../components/PasswordField';
 
 
 class ForgetPassword extends Component {
@@ -20,7 +21,8 @@ class ForgetPassword extends Component {
             confirmPass : '',
             redirectStatus : false,
             status : false,
-
+            errors : {},
+            formError : '',
 		}
 	}
 	componentDidMount(){
@@ -45,26 +47,15 @@ class ForgetPassword extends Component {
     onResetPassword=(e)=>{
         e.preventDefault();
         var email = this.state.email;
-        var newPass = this.state.newPass;
-        var confirmPass = this.state.confirmPass;
-        if(newPass=='')
-        {
-            cogoToast.warn('New password field is required!');
-        }
-        else if(newPass.length < 8)
-        {
-            cogoToast.warn('New Password must be at least 8 characters long.');
-        } 
-        else if(confirmPass=='')
-        {
-            cogoToast.warn('Confirm password field is required!');
-        }
-        else if(newPass!==confirmPass)
-        {
-            cogoToast.error('Both password does not match!');
-        }
-        else
-        {
+        const {newPass, confirmPass} = this.state;
+        const errors = {};
+        if (!newPass) errors.newPass = 'Enter a new password.';
+        else if (newPass.length < 8) errors.newPass = 'Password must be at least 8 characters.';
+        if (!confirmPass) errors.confirmPass = 'Confirm your new password.';
+        else if (newPass !== confirmPass) errors.confirmPass = 'Passwords do not match.';
+        this.setState({errors, formError: ''});
+        if (Object.keys(errors).length) return;
+
             var MyForm = new FormData();
             MyForm.append('email', email);
             MyForm.append('password', confirmPass);
@@ -82,14 +73,17 @@ class ForgetPassword extends Component {
                 }
                 else
                 {
-                    cogoToast.error('Something went wrong!');
+                    this.setState({formError: String(response.data)});
                 }
             })
             .catch(error=>{
-                cogoToast.error('Something went wrong!');
+                const fieldErrors = getFieldErrors(error, {password: 'newPass', password_confirmation: 'confirmPass'});
+                this.setState({
+                    errors: fieldErrors,
+                    formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+                });
             })
-         }
-        }
+    }
     
         RedirectToLogin=()=>{
             if(this.state.status===true)
@@ -121,14 +115,17 @@ class ForgetPassword extends Component {
 
                                     <Form.Group className="mb-3" controlId="formBasicPassword">
                                     <Form.Label>New Password</Form.Label>
-                                        <Form.Control onChange={(e)=>{this.setState({newPass : e.target.value})}} type="password" placeholder="Enter New Password" />
+                                        <PasswordField onChange={(e)=>{this.setState({newPass : e.target.value, errors: {...this.state.errors, newPass: '', confirmPass: ''}, formError: ''})}} isInvalid={Boolean(this.state.errors.newPass)} aria-invalid={Boolean(this.state.errors.newPass)} placeholder="Enter New Password" />
+                                        {this.state.errors.newPass && <Form.Control.Feedback type="invalid">{this.state.errors.newPass}</Form.Control.Feedback>}
                                     </Form.Group> 
 
                                     <Form.Group className="mb-3" controlId="formBasicPassword">
                                     <Form.Label>Confirm Password</Form.Label>
-                                        <Form.Control onChange={(e)=>{this.setState({confirmPass : e.target.value})}} type="password" placeholder="Re-type New Password" />
+                                        <PasswordField onChange={(e)=>{this.setState({confirmPass : e.target.value, errors: {...this.state.errors, confirmPass: ''}, formError: ''})}} isInvalid={Boolean(this.state.errors.confirmPass)} aria-invalid={Boolean(this.state.errors.confirmPass)} placeholder="Re-type New Password" />
+                                        {this.state.errors.confirmPass && <Form.Control.Feedback type="invalid">{this.state.errors.confirmPass}</Form.Control.Feedback>}
                                     </Form.Group>
-                                    <Button className="btn-block mb-3" variant="info" type="submit">
+                                    {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
+                                    <Button className="btn-block mt-4 mb-3" variant="info" type="submit">
                                         Reset Now
                                     </Button>
                                     <div className="text-center text-danger">

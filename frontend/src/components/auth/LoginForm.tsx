@@ -4,8 +4,9 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getSession, signIn } from 'next-auth/react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { demoPreviewEnabled } from '../../lib/demo-preview';
+import PasswordField from '../PasswordField';
 
 type LoginRole = 'user' | 'admin';
 type LoginErrors = Partial<Record<'username' | 'password', string>>;
@@ -27,7 +28,6 @@ export default function LoginForm({ role }: { role: LoginRole }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberUsername, setRememberUsername] = useState(role === 'user');
-  const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [authError, setAuthError] = useState('');
@@ -150,30 +150,20 @@ export default function LoginForm({ role }: { role: LoginRole }) {
 
           <div className="auth-field">
             <label htmlFor={`${role}-password`}>Password</label>
-            <div className="auth-password">
-              <input
-                id={`${role}-password`}
-                autoComplete="current-password"
-                className={`form-control${errors.password ? ' is-invalid' : ''}`}
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  setErrors((current) => ({ ...current, password: undefined }));
-                }}
-                placeholder="Enter your password"
-                type={showPassword ? 'text' : 'password'}
-                aria-invalid={Boolean(errors.password)}
-                aria-describedby={errors.password ? `${role}-password-error` : undefined}
-              />
-              <button
-                type="button"
-                className="auth-password-toggle"
-                onClick={() => setShowPassword((visible) => !visible)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
+            <PasswordField
+              id={`${role}-password`}
+              wrapperClassName="auth-password"
+              autoComplete="current-password"
+              className={errors.password ? 'is-invalid' : ''}
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setErrors((current) => ({ ...current, password: undefined }));
+              }}
+              placeholder="Enter your password"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? `${role}-password-error` : undefined}
+            />
             {errors.password && <p className="field-error" id={`${role}-password-error`} role="alert">{errors.password}</p>}
           </div>
 
@@ -184,7 +174,7 @@ export default function LoginForm({ role }: { role: LoginRole }) {
                 checked={rememberUsername}
                 onChange={(event) => setRememberUsername(event.target.checked)}
               />
-              <span>Remember username</span>
+              <span>Remember Me</span>
             </label>
           )}
 
