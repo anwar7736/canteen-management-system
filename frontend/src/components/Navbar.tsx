@@ -164,7 +164,9 @@ function NavigationBar() {
                     )}
                     <div className="min-w-0">
                         <div className="topbar-shop">{localStorage.getItem('shop_name') || 'Canteen workspace'}</div>
-                        <div className="topbar-caption">Welcome back, {displayName}</div>
+                        <div className="topbar-caption">
+                            {login ? `Welcome back, ${displayName}` : 'Sign in to continue to your canteen'}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
