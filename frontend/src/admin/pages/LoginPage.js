@@ -41,9 +41,15 @@ class LoginPage extends Component {
 
         this.setState({isDisabled: true});
         try {
+            const tenantSlug = window.location.pathname.match(/^\/t\/([^/]+)/)?.[1];
+            if (!tenantSlug) {
+                cogoToast.error('Open your canteen workspace URL to sign in.');
+                return;
+            }
             const result = await signIn('credentials', {
                 redirect: false,
                 role: 'admin',
+                tenantSlug: decodeURIComponent(tenantSlug),
                 username: username.trim(),
                 password,
             });

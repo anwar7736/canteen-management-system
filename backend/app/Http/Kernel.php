@@ -21,6 +21,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
+        \App\Http\Middleware\ResolveTenant::class,
     ];
 
     /**
@@ -65,6 +66,9 @@ class Kernel extends HttpKernel
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'owned.api' => \App\Http\Middleware\EnsureOwnedApiResources::class,
+        'tenant.member' => \App\Http\Middleware\EnsureTenantMembership::class,
+        'tenant.subscribed' => \App\Http\Middleware\EnsureTenantSubscription::class,
+        'tenant.resolve' => \App\Http\Middleware\ResolveTenant::class,
         'precognitive' => \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
         'role' => \App\Http\Middleware\EnsureApiRole::class,
         'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,

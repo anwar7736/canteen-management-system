@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToTenant;
 
 class MonthlyStatement extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
     public $timestamps = false;
 
     protected $casts = [

@@ -7,9 +7,31 @@ import { getSession, signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 import { demoPreviewEnabled } from '../../lib/demo-preview';
 import PasswordField from '../PasswordField';
+import Select2Field from '../Select2Field';
 
 type LoginRole = 'user' | 'admin';
 type LoginErrors = Partial<Record<'username' | 'password', string>>;
+type TenantOption = { name: string; slug: string };
+
+function parseTenantOptions(result: unknown): TenantOption[] {
+  if (!result || typeof result !== 'object' || !('tenants' in result) || !Array.isArray(result.tenants)) {
+    throw new Error('The canteen list response was invalid.');
+  }
+
+  return result.tenants.map((tenant): TenantOption => {
+    if (
+      !tenant ||
+      typeof tenant !== 'object' ||
+      !('name' in tenant) ||
+      typeof tenant.name !== 'string' ||
+      !('slug' in tenant) ||
+      typeof tenant.slug !== 'string'
+    ) {
+      throw new Error('The canteen list response was invalid.');
+    }
+    return { name: tenant.name, slug: tenant.slug };
+  });
+}
 
 function getCallbackPath(callbackUrl: string | null, role: LoginRole) {
   const defaultPath = role === 'admin' ? '/admin' : '/';
@@ -26,11 +48,15 @@ export default function LoginForm({ role }: { role: LoginRole }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
   const [password, setPassword] = useState('');
   const [rememberUsername, setRememberUsername] = useState(role === 'user');
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [authError, setAuthError] = useState('');
+  const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([]);
+  const [tenantOptionsLoading, setTenantOptionsLoading] = useState(role === 'user');
+  const [tenantOptionsError, setTenantOptionsError] = useState('');
 
   const isAdmin = role === 'admin';
 
@@ -51,6 +77,41 @@ export default function LoginForm({ role }: { role: LoginRole }) {
     }
   }, [role]);
 
+  useEffect(() => {
+    if (role !== 'user') return;
+    let cancelled = false;
+
+    async function loadTenants() {
+      try {
+        const response = await fetch('/api/backend/public/tenants', {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        });
+        const result: unknown = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(
+            result && typeof result === 'object' && 'message' in result && typeof result.message === 'string'
+              ? result.message
+              : 'Could not load canteens.'
+          );
+        }
+        const options = parseTenantOptions(result);
+        if (!cancelled) setTenantOptions(options);
+      } catch (error) {
+        if (!cancelled) {
+          setTenantOptionsError(error instanceof Error ? error.message : 'Could not load canteens.');
+        }
+      } finally {
+        if (!cancelled) setTenantOptionsLoading(false);
+      }
+    }
+
+    loadTenants();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors: LoginErrors = {};
@@ -59,12 +120,17 @@ export default function LoginForm({ role }: { role: LoginRole }) {
     setErrors(nextErrors);
     setAuthError('');
     if (Object.keys(nextErrors).length) return;
+    if (!tenantSlug.trim()) {
+      setAuthError(isAdmin ? 'Enter your canteen workspace slug.' : 'Select your canteen.');
+      return;
+    }
 
     setPending(true);
     try {
       const result = await signIn('credentials', {
         redirect: false,
         role,
+        tenantSlug: tenantSlug.trim().toLowerCase(),
         username: username.trim(),
         password,
       });
@@ -107,7 +173,9 @@ export default function LoginForm({ role }: { role: LoginRole }) {
         localStorage.removeItem('pass');
       }
 
-      router.replace(getCallbackPath(searchParams.get('callbackUrl'), role));
+      const workspace = `/t/${encodeURIComponent(tenantSlug.trim().toLowerCase())}`;
+      const callbackPath = getCallbackPath(searchParams.get('callbackUrl'), role);
+      router.replace(`${workspace}${callbackPath === '/' ? '' : callbackPath}`);
     } catch (error) {
       console.error(`${isAdmin ? 'Admin' : 'User'} sign-in failed:`, error);
       setAuthError('Something went wrong. Please try again.');
@@ -129,6 +197,47 @@ export default function LoginForm({ role }: { role: LoginRole }) {
 
         <form noValidate onSubmit={handleSubmit}>
           {authError && <p className="auth-error" role="alert">{authError}</p>}
+
+          {isAdmin ? (
+            <div className="auth-field">
+              <label htmlFor={`${role}-tenant`}>Canteen workspace</label>
+              <input
+                id={`${role}-tenant`}
+                autoComplete="url"
+                className="form-control"
+                value={tenantSlug}
+                onChange={(event) => setTenantSlug(event.target.value)}
+                placeholder="Enter your workspace slug"
+                required
+              />
+            </div>
+          ) : (
+            <div className="auth-field">
+              <label htmlFor={`${role}-tenant`}>Canteen workspace</label>
+              {tenantOptionsLoading ? (
+                <select id={`${role}-tenant`} className="form-control" disabled aria-label="Canteen workspace">
+                  <option value="">Loading canteens…</option>
+                </select>
+              ) : (
+                <Select2Field
+                  id={`${role}-tenant`}
+                  value={tenantSlug}
+                  onChange={(value) => {
+                    setTenantSlug(value);
+                    setAuthError('');
+                  }}
+                  disabled={tenantOptions.length === 0 || Boolean(tenantOptionsError)}
+                  ariaLabel="Canteen workspace"
+                >
+                  <option value="">{tenantOptions.length ? 'Select your canteen' : 'No canteens available'}</option>
+                  {tenantOptions.map((tenant) => (
+                    <option key={tenant.slug} value={tenant.slug}>{tenant.name}</option>
+                  ))}
+                </Select2Field>
+              )}
+              {tenantOptionsError && <p className="field-error" role="alert">{tenantOptionsError}</p>}
+            </div>
+          )}
 
           <div className="auth-field">
             <label htmlFor={`${role}-username`}>Username</label>

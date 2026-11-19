@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use App\Notifications\AdminNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use App\Tenancy\TenantContext;
 
 class NotificationController extends Controller
 {
@@ -55,13 +56,15 @@ class NotificationController extends Controller
         ]);
         $author = $req->user();
         $createdAt = now('Asia/Dhaka');
+        $tenantId = app(TenantContext::class)->id();
 
-        return DB::transaction(function () use ($author, $validated, $createdAt) {
+        return DB::transaction(function () use ($author, $validated, $createdAt, $tenantId) {
             if ($author->role !== 'admin' && !User::where('role', 'admin')->exists()) {
                 return 0;
             }
 
             $notificationId = DB::table('notifications')->insertGetId([
+                'tenant_id' => $tenantId,
                 'author_id' => $author->getKey(),
                 'author_name' => $author->name,
                 'msg_title' => $validated['msg_title'],
@@ -70,8 +73,9 @@ class NotificationController extends Controller
                 'create_time' => $createdAt->format('H:i:s'),
             ]);
 
-            $insertRecipients = function ($userIds) use ($notificationId, $createdAt) {
+            $insertRecipients = function ($userIds) use ($notificationId, $createdAt, $tenantId) {
                 $rows = collect($userIds)->map(fn ($userId) => [
+                    'tenant_id' => $tenantId,
                     'notification_id' => $notificationId,
                     'user_id' => $userId,
                     'status' => 'Latest',
@@ -150,9 +154,12 @@ class NotificationController extends Controller
     function GetSelfCreatedNotification(Request $req)
     {
         $user_id = $req->user_id;
+        $tenantId = app(TenantContext::class)->id();
         $data = DB::table('notifications')
                 ->join('notification_details', 'notifications.id', 'notification_details.notification_id')
                 ->where('notifications.author_id', $user_id)
+                ->where('notifications.tenant_id', $tenantId)
+                ->where('notification_details.tenant_id', $tenantId)
                 ->select('notifications.*', 'notification_details.status')
                 ->orderBy('notifications.id', 'desc')
                 ->get();
@@ -163,9 +170,12 @@ class NotificationController extends Controller
     function GetAdminNotificationByUser(Request $req)
     {
         $user_id = $req->user_id;
+        $tenantId = app(TenantContext::class)->id();
         $data = DB::table('notification_details')
                 ->join('notifications', 'notification_details.notification_id', 'notifications.id')
                 ->where('notification_details.user_id', $user_id)
+                ->where('notification_details.tenant_id', $tenantId)
+                ->where('notifications.tenant_id', $tenantId)
                 ->select('notification_details.*', 'notifications.author_name', 'notifications.msg_title', 'notifications.msg_body')
                 ->orderBy('notification_details.id', 'desc')
                 ->get();

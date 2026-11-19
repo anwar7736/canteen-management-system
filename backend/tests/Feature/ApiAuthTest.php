@@ -4,13 +4,21 @@ namespace Tests\Feature;
 
 use App\Models\OTPModel;
 use App\Models\MonthlyStatement;
+use App\Models\Tenant;
+use App\Models\TenantSignupVerification;
+use App\Models\TenantSubscription;
+use App\Models\SubscriptionPayment;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Http\Controllers\OrderMealController;
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use App\Mail\VerificationMail;
+use App\Mail\TenantSignupVerificationMail;
 use Tests\TestCase;
 
 class ApiAuthTest extends TestCase
@@ -61,6 +69,370 @@ class ApiAuthTest extends TestCase
         $this->withToken($token)
             ->getJson('/api/GetUserProfile/'.$otherUser->id)
             ->assertForbidden();
+    }
+
+    public function test_platform_admin_token_can_access_platform_routes_without_tenant_users(): void
+    {
+        $tenantUser = $this->createUser('user', 'tenant-member');
+        app(TenantContext::class)->clear();
+        $platformAdmin = User::create([
+            'tenant_id' => null,
+            'name' => 'Platform Admin',
+            'username' => 'platform-admin',
+            'email' => 'platform-admin@example.test',
+            'phone' => '1000000000',
+            'token_no' => 999999,
+            'role' => 'platform_admin',
+            'status' => 'active',
+            'password' => Hash::make('correct-password'),
+        ]);
+
+        $login = $this->postJson('/api/platform/login', [
+            'username' => $platformAdmin->username,
+            'password' => 'correct-password',
+        ])->assertOk()->assertJsonPath('role', 'platform_admin');
+
+        $tenant = Tenant::findOrFail($tenantUser->tenant_id);
+        $plan = SubscriptionPlan::create([
+            'name' => 'Platform Test Plan',
+            'slug' => 'platform-test-plan',
+            'price' => 100,
+            'currency' => 'BDT',
+            'interval' => 'monthly',
+            'trial_days' => 0,
+            'active' => true,
+        ]);
+        $subscription = TenantSubscription::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $plan->id,
+            'status' => 'active',
+        ]);
+        SubscriptionPayment::create([
+            'tenant_id' => $tenant->id,
+            'subscription_id' => $subscription->id,
+            'plan_id' => $plan->id,
+            'amount' => 100,
+            'currency' => 'BDT',
+            'transaction_id' => 'PLATFORM-TEST-PAYMENT',
+            'status' => 'Paid',
+            'gateway' => 'sslcommerz',
+        ]);
+
+        app(TenantContext::class)->set($tenant);
+        $this->withToken($login->json('api_token'))
+            ->getJson('/api/platform/tenants')
+            ->assertOk()
+            ->assertJsonStructure(['data']);
+
+        app(TenantContext::class)->set($tenant);
+        $this->withToken($login->json('api_token'))
+            ->getJson('/api/platform/payments')
+            ->assertOk()
+            ->assertJsonPath('data.0.transaction_id', 'PLATFORM-TEST-PAYMENT')
+            ->assertJsonPath('data.0.tenant.name', $tenant->name)
+            ->assertJsonPath('data.0.plan.name', $plan->name);
+
+        $visibleUserIds = User::query()->pluck('id')->all();
+        $this->assertContains($platformAdmin->id, $visibleUserIds);
+        $this->assertNotContains($tenantUser->id, $visibleUserIds);
+    }
+
+    public function test_platform_admin_can_create_update_and_delete_tenant_users_and_workspaces(): void
+    {
+        $tenant = Tenant::query()->firstOrFail();
+        app(TenantContext::class)->set($tenant);
+        $this->createUser('user', 'tenant-count-check');
+        $platformAdmin = $this->createPlatformAdmin();
+        $token = $platformAdmin->createToken('platform-test', ['platform_admin'])->plainTextToken;
+
+        $this->withToken($token)
+            ->getJson('/api/platform/tenants')
+            ->assertOk()
+            ->assertJsonPath('data.0.users_count', 1);
+
+        $newPlan = SubscriptionPlan::create([
+            'name' => 'Updated Tenant Plan',
+            'slug' => 'updated-tenant-plan',
+            'price' => 250,
+            'currency' => 'BDT',
+            'interval' => 'monthly',
+            'trial_days' => 0,
+            'active' => true,
+        ]);
+        $this->withToken($token)
+            ->patchJson('/api/platform/tenants/'.$tenant->id, [
+                'name' => 'Updated platform tenant',
+                'slug' => 'updated-platform-tenant',
+                'status' => 'suspended',
+                'plan_id' => $newPlan->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('name', 'Updated platform tenant')
+            ->assertJsonPath('status', 'suspended')
+            ->assertJsonPath('subscriptions.0.plan_id', $newPlan->id);
+
+        $createdUser = $this->withToken($token)
+            ->postJson('/api/platform/tenants/'.$tenant->id.'/users', [
+                'name' => 'Platform-created member',
+                'username' => 'platform-created-member',
+                'email' => 'platform-created-member@example.test',
+                'phone' => '1200000001',
+                'role' => 'user',
+                'status' => 'active',
+                'password' => 'very-secure-password',
+                'password_confirmation' => 'very-secure-password',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.username', 'platform-created-member')
+            ->assertJsonMissingPath('data.password')
+            ->json('data');
+
+        $this->withToken($token)
+            ->patchJson('/api/platform/tenants/'.$tenant->id.'/users/'.$createdUser['id'], [
+                'status' => 'inactive',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'inactive');
+
+        Mail::fake();
+        $this->withToken($token)
+            ->postJson('/api/platform/tenants/'.$tenant->id.'/users/'.$createdUser['id'].'/password-reset')
+            ->assertOk();
+        Mail::assertSent(VerificationMail::class);
+
+        $this->withToken($token)
+            ->deleteJson('/api/platform/tenants/'.$tenant->id.'/users/'.$createdUser['id'])
+            ->assertOk();
+        $this->assertDatabaseMissing('users', ['id' => $createdUser['id']]);
+
+        $plan = SubscriptionPlan::query()->where('slug', 'starter')->firstOrFail();
+        $createdWorkspace = $this->withToken($token)
+            ->postJson('/api/platform/tenants', [
+                'tenant_name' => 'Platform Created Canteen',
+                'tenant_slug' => 'platform-created-canteen',
+                'name' => 'Workspace owner',
+                'username' => 'workspace-owner',
+                'email' => 'workspace-owner@example.test',
+                'phone' => '1200000002',
+                'password' => 'very-secure-password',
+                'password_confirmation' => 'very-secure-password',
+                'plan_id' => $plan->id,
+            ])
+            ->assertCreated()
+            ->json('tenant');
+
+        $this->withToken($token)
+            ->deleteJson('/api/platform/tenants/'.$createdWorkspace['id'])
+            ->assertOk();
+        $this->assertDatabaseMissing('tenants', ['id' => $createdWorkspace['id']]);
+        $this->assertDatabaseMissing('users', ['tenant_id' => $createdWorkspace['id']]);
+        $this->assertDatabaseMissing('admin_profile', ['tenant_id' => $createdWorkspace['id']]);
+    }
+
+    public function test_public_tenant_registration_still_creates_a_workspace_and_owner_token(): void
+    {
+        Mail::fake();
+        $email = 'public-signup-owner@example.test';
+        $this->postJson('/api/tenant/register/send-otp', [
+            'email' => $email,
+            'name' => 'Public Signup Owner',
+        ])->assertOk();
+
+        $otp = null;
+        Mail::assertSent(TenantSignupVerificationMail::class, function (TenantSignupVerificationMail $mail) use (&$otp, $email) {
+            $otp = $mail->otp;
+
+            return $mail->hasTo($email);
+        });
+        $this->assertIsString($otp);
+
+        $this->postJson('/api/tenant/register/verify-otp', [
+            'email' => $email,
+            'otp' => '000000',
+        ])->assertUnprocessable();
+
+        $signupToken = $this->postJson('/api/tenant/register/verify-otp', [
+            'email' => $email,
+            'otp' => $otp,
+        ])->assertOk()->json('signup_token');
+
+        $response = $this->postJson('/api/tenant/register', [
+            'tenant_name' => 'Public Signup Canteen',
+            'tenant_slug' => 'public-signup-canteen',
+            'name' => 'Public Signup Owner',
+            'username' => 'public-signup-owner',
+            'email' => $email,
+            'phone' => '1200000003',
+            'password' => 'very-secure-password',
+            'password_confirmation' => 'very-secure-password',
+            'signup_token' => $signupToken,
+        ])->assertCreated()
+            ->assertJsonPath('tenant.slug', 'public-signup-canteen')
+            ->assertJsonPath('user.role', 'admin');
+
+        $tenantId = $response->json('tenant.id');
+        $this->assertIsString($response->json('api_token'));
+        $this->assertDatabaseHas('users', [
+            'tenant_id' => $tenantId,
+            'username' => 'public-signup-owner',
+            'role' => 'admin',
+        ]);
+        $this->assertDatabaseHas('admin_profile', ['tenant_id' => $tenantId]);
+        $this->assertDatabaseHas('meal_rates', ['tenant_id' => $tenantId]);
+        $this->assertDatabaseHas('tenant_subscriptions', ['tenant_id' => $tenantId]);
+        $this->assertNotNull(TenantSignupVerification::where('email', $email)->value('consumed_at'));
+
+        $this->postJson('/api/tenant/register', [
+            'tenant_name' => 'Another Signup Canteen',
+            'tenant_slug' => 'another-signup-canteen',
+            'name' => 'Another Signup Owner',
+            'username' => 'another-signup-owner',
+            'email' => $email,
+            'phone' => '1200000004',
+            'password' => 'very-secure-password',
+            'password_confirmation' => 'very-secure-password',
+            'signup_token' => $signupToken,
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Verify this email address before creating a workspace.');
+    }
+
+    public function test_tenant_signup_otp_allows_only_five_incorrect_attempts(): void
+    {
+        Mail::fake();
+        $email = 'signup-otp-limit@example.test';
+        $this->postJson('/api/tenant/register/send-otp', ['email' => $email])->assertOk();
+
+        $otp = null;
+        Mail::assertSent(TenantSignupVerificationMail::class, function (TenantSignupVerificationMail $mail) use (&$otp) {
+            $otp = $mail->otp;
+
+            return true;
+        });
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/tenant/register/verify-otp', [
+                'email' => $email,
+                'otp' => $otp === '000000' ? '000001' : '000000',
+            ])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/tenant/register/verify-otp', [
+            'email' => $email,
+            'otp' => $otp,
+        ])->assertUnprocessable();
+        $this->assertDatabaseHas('tenant_signup_verifications', [
+            'email' => $email,
+            'attempts' => 5,
+            'verified_at' => null,
+        ]);
+    }
+
+    public function test_tenant_signup_otp_can_be_resent_and_verification_retried(): void
+    {
+        Mail::fake();
+        $email = 'signup-otp-resend@example.test';
+        $this->postJson('/api/tenant/register/send-otp', ['email' => $email])->assertOk();
+        $firstVerification = TenantSignupVerification::where('email', $email)->firstOrFail();
+
+        $this->travel(61)->seconds();
+        $this->postJson('/api/tenant/register/resend-otp', ['email' => $email])->assertOk();
+
+        $this->assertNotNull($firstVerification->fresh()->consumed_at);
+        $codes = [];
+        Mail::assertSent(TenantSignupVerificationMail::class, function (TenantSignupVerificationMail $mail) use (&$codes, $email) {
+            if ($mail->hasTo($email)) {
+                $codes[] = $mail->otp;
+            }
+
+            return $mail->hasTo($email);
+        });
+        $this->assertCount(2, $codes);
+
+        $firstToken = $this->postJson('/api/tenant/register/verify-otp', [
+            'email' => $email,
+            'otp' => $codes[1],
+        ])->assertOk()->json('signup_token');
+
+        $retryToken = $this->postJson('/api/tenant/register/verify-otp', [
+            'email' => $email,
+            'otp' => $codes[1],
+        ])->assertOk()->json('signup_token');
+
+        $this->assertNotSame($firstToken, $retryToken);
+        $this->assertSame(
+            hash('sha256', $retryToken),
+            TenantSignupVerification::where('email', $email)->latest('id')->value('signup_token_hash')
+        );
+    }
+
+    public function test_public_tenant_list_only_returns_active_tenants_without_a_tenant_header(): void
+    {
+        $existingTenant = Tenant::query()->firstOrFail();
+        $existingTenant->update(['name' => 'Beta Canteen', 'status' => 'active']);
+        Tenant::create([
+            'name' => 'Alpha Canteen',
+            'slug' => 'alpha-canteen',
+            'status' => 'active',
+        ]);
+        Tenant::create([
+            'name' => 'Suspended Canteen',
+            'slug' => 'suspended-canteen',
+            'status' => 'suspended',
+        ]);
+
+        $this->withoutHeader('X-Tenant-Slug')
+            ->getJson('/api/public/tenants')
+            ->assertOk()
+            ->assertJsonCount(2, 'tenants')
+            ->assertJsonPath('tenants.0.slug', 'alpha-canteen')
+            ->assertJsonPath('tenants.1.slug', $existingTenant->slug)
+            ->assertJsonMissing(['name' => 'Suspended Canteen']);
+    }
+
+    public function test_platform_impersonation_is_audited_expires_and_can_be_ended_by_target(): void
+    {
+        $tenant = Tenant::query()->firstOrFail();
+        app(TenantContext::class)->set($tenant);
+        $target = $this->createUser('user', 'impersonation-target');
+        $platformAdmin = $this->createPlatformAdmin();
+        $platformToken = $platformAdmin->createToken('platform-test', ['platform_admin'])->plainTextToken;
+
+        $response = $this->withToken($platformToken)
+            ->postJson('/api/platform/impersonations', [
+                'user_id' => $target->id,
+                'reason' => 'Investigate support ticket 123',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('user.id', $target->id)
+            ->assertJsonPath('tenant.slug', $tenant->slug);
+
+        $impersonationId = $response->json('id');
+        $impersonationToken = $response->json('api_token');
+        $this->assertDatabaseHas('platform_impersonations', [
+            'id' => $impersonationId,
+            'platform_admin_id' => $platformAdmin->id,
+            'platform_admin_username' => $platformAdmin->username,
+            'target_user_id' => $target->id,
+            'target_username' => $target->username,
+            'tenant_id' => $tenant->id,
+            'tenant_name' => $tenant->name,
+            'tenant_slug' => $tenant->slug,
+            'reason' => 'Investigate support ticket 123',
+            'ended_at' => null,
+        ]);
+        $expiresAt = \Illuminate\Support\Carbon::parse($response->json('expires_at'));
+        $this->assertTrue($expiresAt->between(now()->addMinutes(14), now()->addMinutes(16)));
+
+        $this->withHeader('X-Tenant-Slug', $tenant->slug)
+            ->withToken($impersonationToken)
+            ->postJson('/api/impersonations/'.$impersonationId.'/end')
+            ->assertOk();
+
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $target->id,
+            'name' => 'platform-impersonation',
+        ]);
+        $this->assertNotNull(DB::table('platform_impersonations')->where('id', $impersonationId)->value('ended_at'));
     }
 
     public function test_password_reset_requires_a_verified_one_time_token_and_revokes_sessions(): void
@@ -121,6 +493,7 @@ class ApiAuthTest extends TestCase
 
         foreach (['January', 'February'] as $month) {
             \Illuminate\Support\Facades\DB::table('monthly_statements')->insert([
+                'tenant_id' => $member->tenant_id,
                 'year' => $year,
                 'month' => $month,
                 'token_no' => $member->token_no,
@@ -137,6 +510,7 @@ class ApiAuthTest extends TestCase
         }
 
         DB::table('payments')->insert([
+            'tenant_id' => $member->tenant_id,
             'year' => $year,
             'month' => 'January',
             'name' => $member->name,
@@ -183,6 +557,7 @@ class ApiAuthTest extends TestCase
         $user = $this->createUser('user', 'unique-keys');
 
         $this->assertConstraintViolation(fn () => DB::table('users')->insert([
+            'tenant_id' => $user->tenant_id,
             'name' => 'Duplicate token',
             'username' => 'different-username',
             'email' => 'different-token@example.test',
@@ -194,6 +569,7 @@ class ApiAuthTest extends TestCase
         ]));
 
         DB::table('monthly_statements')->insert($statement = [
+            'tenant_id' => $user->tenant_id,
             'year' => 2026,
             'month' => 'November',
             'token_no' => $user->token_no,
@@ -210,6 +586,7 @@ class ApiAuthTest extends TestCase
         $this->assertConstraintViolation(fn () => DB::table('monthly_statements')->insert($statement));
 
         $notificationId = DB::table('notifications')->insertGetId([
+            'tenant_id' => $user->tenant_id,
             'author_id' => $user->id,
             'author_name' => $user->name,
             'msg_title' => 'Test',
@@ -218,6 +595,7 @@ class ApiAuthTest extends TestCase
             'create_time' => now()->format('H:i:s'),
         ]);
         $recipient = [
+            'tenant_id' => $user->tenant_id,
             'notification_id' => $notificationId,
             'user_id' => $user->id,
             'status' => 'Unread',
@@ -235,6 +613,7 @@ class ApiAuthTest extends TestCase
     {
         $user = $this->createUser('user', 'order-owner');
         $order = [
+            'tenant_id' => $user->tenant_id,
             'user_id' => $user->id,
             'token_no' => $user->token_no,
             'lunch' => 1,
@@ -266,6 +645,7 @@ class ApiAuthTest extends TestCase
         $date = $now->toDateString();
 
         DB::table('meal_rates')->insert([
+            'tenant_id' => $user->tenant_id,
             'lunch_expiry_time' => '10:00',
             'dinner_expiry_time' => '17:00',
             'lunch_rate' => 10,
@@ -277,6 +657,7 @@ class ApiAuthTest extends TestCase
 
         DB::table('order_meals')->insert([
             [
+                'tenant_id' => $user->tenant_id,
                 'user_id' => $user->id,
                 'token_no' => $user->token_no,
                 'lunch' => 2,
@@ -293,6 +674,7 @@ class ApiAuthTest extends TestCase
                 'updated_at' => $now,
             ],
             [
+                'tenant_id' => $user->tenant_id,
                 'user_id' => $user->id,
                 'token_no' => $user->token_no,
                 'lunch' => 1,
@@ -311,6 +693,7 @@ class ApiAuthTest extends TestCase
         ]);
 
         DB::table('payments')->insert([
+            'tenant_id' => $user->tenant_id,
             'year' => $now->year,
             'month' => $now->format('F'),
             'name' => $user->name,
@@ -325,6 +708,7 @@ class ApiAuthTest extends TestCase
             'payment_time' => $now->format('h:i:sa'),
         ]);
         DB::table('payments')->insert([
+            'tenant_id' => $user->tenant_id,
             'year' => $now->year,
             'month' => $now->format('F'),
             'name' => $user->name,
@@ -384,6 +768,23 @@ class ApiAuthTest extends TestCase
             'phone' => random_int(1000000000, 9999999999),
             'token_no' => random_int(111111, 999999),
             'role' => $role,
+            'status' => 'active',
+            'password' => Hash::make('correct-password'),
+        ]);
+    }
+
+    private function createPlatformAdmin(): User
+    {
+        app(TenantContext::class)->clear();
+
+        return User::create([
+            'tenant_id' => null,
+            'name' => 'Platform Admin',
+            'username' => 'platform-admin-'.$this->name(),
+            'email' => 'platform-admin-'.$this->name().'@example.test',
+            'phone' => random_int(1000000000, 9999999999),
+            'token_no' => random_int(111111, 999999),
+            'role' => 'platform_admin',
             'status' => 'active',
             'password' => Hash::make('correct-password'),
         ]);

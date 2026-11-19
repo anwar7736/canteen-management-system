@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\OrderMeal;
+use App\Tenancy\TenantContext;
 use DB;
 
 class DayWiseMealController extends Controller
@@ -19,9 +20,12 @@ class DayWiseMealController extends Controller
     public function GetMealByOrderId(Request $req)
     {
         $order_id = $req->order_id;
+        $tenantId = app(TenantContext::class)->id();
         $details = DB::table('users')
                 ->join('order_meals', 'order_meals.user_id', 'users.id')
                 ->where(['order_meals.id'=>$order_id])
+                ->where('users.tenant_id', $tenantId)
+                ->where('order_meals.tenant_id', $tenantId)
                 ->get();
                 
         return $details;

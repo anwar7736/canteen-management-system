@@ -1,6 +1,7 @@
 import { getToken } from 'next-auth/jwt';
 import { NextResponse, type NextRequest } from 'next/server';
 import { demoPreviewEnabled } from './lib/demo-preview';
+import { IMPERSONATION_COOKIE } from './lib/impersonation-cookie';
 
 const publicAdminPaths = [
   '/admin/login',
@@ -9,63 +10,71 @@ const publicAdminPaths = [
   '/admin/forget_password',
 ];
 
-const protectedUserPaths = [
-  '/',
-  '/user_profile',
-  '/dailyMealItem',
-  '/send_message',
-  '/admin_notification',
-  '/all_notification',
-  '/order_daily_meal',
-  '/day_wise_meal',
-  '/make_payment',
-  '/payment_summary',
-  '/user_token',
-  '/monthly_statement',
-  '/change_password',
-];
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
-  const isPublicAdminRoute = publicAdminPaths.includes(pathname);
-  const isProtectedUserRoute = protectedUserPaths.includes(pathname);
+  const tenantMatch = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
+  const isPlatformRoute = pathname === '/platform' || pathname.startsWith('/platform/');
 
-  if ((!isAdminRoute || isPublicAdminRoute) && !isProtectedUserRoute) {
-    return NextResponse.next();
-  }
-  if (!isAdminRoute && isProtectedUserRoute && demoPreviewEnabled) {
-    return NextResponse.next();
-  }
+  if (!tenantMatch && !isPlatformRoute) return NextResponse.next();
+
+  const tenantSlug = tenantMatch ? decodeURIComponent(tenantMatch[1]) : null;
+  const tenantPath = tenantMatch ? tenantMatch[2] || '/' : pathname;
+  const isAdminRoute = isPlatformRoute || tenantPath === '/admin' || tenantPath.startsWith('/admin/');
+  const isPublicTenantPath = tenantMatch && (
+    tenantPath === '/login' ||
+    tenantPath === '/email_verification' ||
+    tenantPath === '/otp_verification' ||
+    tenantPath === '/reset_password' ||
+    tenantPath === '/manifest.webmanifest' ||
+    tenantPath === '/admin/manifest.webmanifest' ||
+    publicAdminPaths.some((path) => tenantPath === path)
+  );
+  const isPublicPlatformPath = isPlatformRoute && (
+    pathname === '/platform/login' ||
+    pathname === '/platform/manifest.webmanifest'
+  );
+
+  if (isPublicTenantPath || isPublicPlatformPath) return NextResponse.next();
+  if (tenantMatch && !isAdminRoute && demoPreviewEnabled) return NextResponse.next();
 
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
-  const expectedRole = isAdminRoute ? 'admin' : 'user';
-  if (token?.role === expectedRole) return NextResponse.next();
+  const impersonationToken = tenantMatch
+    ? await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+        cookieName: IMPERSONATION_COOKIE,
+      })
+    : null;
+  const expectedRole = isPlatformRoute ? 'platform_admin' : isAdminRoute ? 'admin' : 'user';
+  if (
+    tenantMatch &&
+    impersonationToken?.role === expectedRole &&
+    impersonationToken.tenantSlug === tenantSlug &&
+    typeof impersonationToken.impersonationId === 'number'
+  ) {
+    return NextResponse.next();
+  }
+  if (
+    token?.role === expectedRole &&
+    (isPlatformRoute || token.tenantSlug === tenantSlug)
+  ) {
+    return NextResponse.next();
+  }
 
-  const signInPath = isAdminRoute ? '/admin/login' : '/login';
+  const signInPath = isPlatformRoute
+    ? '/platform/login'
+    : `${tenantMatch?.[0]}${isAdminRoute ? '/admin/login' : '/login'}`;
   const signInUrl = new URL(signInPath, request.url);
-  signInUrl.searchParams.set('callbackUrl', pathname);
+  signInUrl.searchParams.set('callbackUrl', tenantMatch ? tenantPath : pathname);
   return NextResponse.redirect(signInUrl);
 }
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/',
-    '/user_profile',
-    '/dailyMealItem',
-    '/send_message',
-    '/admin_notification',
-    '/all_notification',
-    '/order_daily_meal',
-    '/day_wise_meal',
-    '/make_payment',
-    '/payment_summary',
-    '/user_token',
-    '/monthly_statement',
-    '/change_password',
+    '/t/:path*',
+    '/platform/:path*',
   ],
 };

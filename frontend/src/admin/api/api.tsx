@@ -56,6 +56,9 @@ class api {
 	static GetProfileInfo   = this.baseURL + "GetProfileInfo";
 	static UpdateAdminProfile   = this.baseURL + "UpdateAdminProfile";
 	static ChangeMealStatus   = this.baseURL + "ChangeMealStatus";
+	static GetSubscriptionPlans = this.baseURL + "tenant/plans";
+	static GetTenantSubscription = this.baseURL + "tenant/subscription";
+	static CheckoutSubscription = this.baseURL + "tenant/subscription/checkout";
 
 }
 

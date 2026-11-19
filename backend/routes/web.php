@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SslCommerzPaymentController;
+use App\Http\Controllers\SubscriptionController;
 
 
 //Home page
@@ -19,6 +20,10 @@ Route::view('/', 'welcome');
     Route::post('/cancel', [SslCommerzPaymentController::class, 'cancel']);
 
     Route::post('/ipn', [SslCommerzPaymentController::class, 'ipn']);
+    Route::post('/subscription/success', [SubscriptionController::class, 'success']);
+    Route::post('/subscription/fail', [SubscriptionController::class, 'fail']);
+    Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel']);
+    Route::post('/subscription/ipn', [SubscriptionController::class, 'ipn']);
     //SSLCOMMERZ END
 
 

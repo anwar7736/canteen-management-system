@@ -150,9 +150,9 @@ function NavigationBar() {
                 onClick={() => setSideNav(false)}
                 aria-label="Close navigation"
             />
-            <header className="user-topbar">
-                <div className="flex min-w-0 items-center gap-3">
-                    {login && (
+            {login && (
+                <header className="user-topbar">
+                    <div className="flex min-w-0 items-center gap-3">
                         <button
                             type="button"
                             className="user-sidebar-toggle"
@@ -161,16 +161,12 @@ function NavigationBar() {
                         >
                             <FontAwesomeIcon icon={faBars}/>
                         </button>
-                    )}
-                    <div className="min-w-0">
-                        <div className="topbar-shop">{localStorage.getItem('shop_name') || 'Canteen workspace'}</div>
-                        <div className="topbar-caption">
-                            {login ? `Welcome back, ${displayName}` : 'Sign in to continue to your canteen'}
+                        <div className="min-w-0">
+                            <div className="topbar-shop">{localStorage.getItem('shop_name') || 'Canteen workspace'}</div>
+                            <div className="topbar-caption">Welcome back, {displayName}</div>
                         </div>
                     </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    {login && (
+                    <div className="flex items-center gap-3">
                         <Link
                             to="/admin_notification"
                             className="relative grid h-10 w-10 place-items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]"
@@ -182,9 +178,7 @@ function NavigationBar() {
                                     {countLatest}
                                 </span>
                             )}
-                        </Link>
-                    )}
-                    {login && (
+                            </Link>
                         <Link to="/user_profile" className="hidden items-center gap-2 sm:flex">
                             <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                                 <FontAwesomeIcon icon={faUser}/>
@@ -193,9 +187,9 @@ function NavigationBar() {
                                 {displayName}
                             </span>
                         </Link>
-                    )}
-                </div>
-            </header>
+                    </div>
+                </header>
+            )}
         </div>
     );
 }

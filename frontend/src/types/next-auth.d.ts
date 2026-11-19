@@ -4,7 +4,8 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string;
-      role: 'user' | 'admin';
+      role: 'user' | 'admin' | 'platform_admin';
+      tenantSlug?: string;
       phone?: string;
       token_no?: string;
       photo?: string;
@@ -13,7 +14,8 @@ declare module 'next-auth' {
   }
 
   interface User {
-    role: 'user' | 'admin';
+    role: 'user' | 'admin' | 'platform_admin';
+    tenantSlug?: string;
     apiToken: string;
     phone?: string;
     token_no?: string;
@@ -24,11 +26,16 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    role?: 'user' | 'admin';
+    role?: 'user' | 'admin' | 'platform_admin';
+    tenantSlug?: string;
     apiToken?: string;
     phone?: string;
     token_no?: string;
     photo?: string;
     address?: string;
+    impersonationId?: number;
+    impersonatedUserName?: string;
+    tenantName?: string;
+    expiresAt?: string;
   }
 }

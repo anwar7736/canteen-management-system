@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Library\SslCommerz\SslCommerzNotification;
 use App\Models\MonthlyStatement;
 use App\Models\User;
+use App\Models\Tenant;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,7 +97,12 @@ class SslCommerzPaymentController extends Controller
         }
 
         $now = now('Asia/Dhaka');
+        $tenantId = app(TenantContext::class)->id();
+        if ($tenantId === null) {
+            abort(400, 'A tenant context is required to start payment.');
+        }
         DB::table('payments')->insert([
+            'tenant_id' => $tenantId,
             'year' => $validated['year'],
             'month' => $validated['month'],
             'name' => $validated['customer_name'],
@@ -171,6 +178,11 @@ class SslCommerzPaymentController extends Controller
         if (!$payment) {
             return 'invalid';
         }
+        $tenant = Tenant::find($payment->tenant_id);
+        if (!$tenant || $tenant->status !== 'active') {
+            return 'invalid';
+        }
+        app(TenantContext::class)->set($tenant);
 
         if (in_array($payment->status, ['Processing', 'Complete'], true)) {
             return 'already_completed';
@@ -205,6 +217,7 @@ class SslCommerzPaymentController extends Controller
             }
 
             DB::table('payments')
+                ->where('tenant_id', $lockedPayment->tenant_id)
                 ->where('id', $lockedPayment->id)
                 ->where('status', 'Pending')
                 ->update(['status' => 'Processing']);
@@ -218,7 +231,9 @@ class SslCommerzPaymentController extends Controller
             if ($statement) {
                 $totalPayment = (float) $statement->total_payment + (float) $lockedPayment->amount;
                 $balance = (float) $statement->total_cost - $totalPayment;
-                DB::table('monthly_statements')->where('id', $statement->id)->update([
+                DB::table('monthly_statements')
+                    ->where('tenant_id', $lockedPayment->tenant_id)
+                    ->where('id', $statement->id)->update([
                     'total_payment' => $totalPayment,
                     'give' => max($balance, 0),
                     'take' => max(-$balance, 0),

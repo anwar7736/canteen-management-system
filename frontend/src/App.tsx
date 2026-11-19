@@ -20,6 +20,11 @@ Axios.interceptors.request.use((config) => {
     return config;
   }
 
+  const tenantMatch = window.location.pathname.match(/^\/t\/([^/]+)/);
+  if (tenantMatch) {
+    config.headers.set('X-Tenant-Slug', decodeURIComponent(tenantMatch[1]));
+  }
+
   if (window.localStorage.getItem('demo_preview') !== 'true') return config;
 
   const requestUrl = new URL(config.url || '', window.location.origin);
@@ -42,8 +47,13 @@ Axios.interceptors.request.use((config) => {
 });
 
 function App() {
+  const tenantMatch = typeof window === 'undefined'
+    ? null
+    : window.location.pathname.match(/^\/t\/([^/]+)/);
+  const basename = tenantMatch ? `/t/${tenantMatch[1]}` : undefined;
+
   return (
-    <Router>
+    <Router basename={basename}>
       <RouteProgress />
       <Routes />
     </Router>

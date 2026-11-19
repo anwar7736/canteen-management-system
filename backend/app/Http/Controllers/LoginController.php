@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\OTPModel;
+use App\Tenancy\TenantScope;
+use App\Tenancy\TenantContext;
 use App\Mail\AdminVerification;
 use Hash;
 use Mail;
@@ -48,6 +50,28 @@ class LoginController extends Controller
 
         $user = $admin->toArray();
         $user['api_token'] = $admin->createToken('admin-panel', ['admin'])->plainTextToken;
+
+        return $user;
+    }
+
+    public function PlatformLogin(Request $req)
+    {
+        $validated = $req->validate([
+            'username' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'max:255'],
+        ]);
+        $admin = User::withoutGlobalScope(TenantScope::class)
+            ->whereNull('tenant_id')
+            ->where('username', $validated['username'])
+            ->first();
+
+        if (!$admin || $admin->role !== 'platform_admin' || $admin->status !== 'active'
+            || !Hash::check($validated['password'], $admin->password)) {
+            return 0;
+        }
+
+        $user = $admin->toArray();
+        $user['api_token'] = $admin->createToken('platform-admin', ['platform_admin'])->plainTextToken;
 
         return $user;
     }

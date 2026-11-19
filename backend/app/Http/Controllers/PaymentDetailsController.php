@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Tenancy\TenantContext;
 
 class PaymentDetailsController extends Controller
 {
@@ -36,6 +37,7 @@ class PaymentDetailsController extends Controller
             $now = now('Asia/Dhaka');
 
             DB::table('payments')->insert([
+                'tenant_id' => app(TenantContext::class)->id(),
                 'year' => $validated['year'],
                 'month' => $validated['month'],
                 'name' => $user->name,
@@ -77,7 +79,8 @@ class PaymentDetailsController extends Controller
             ];
             $statements = $this->lockStatements($periods);
 
-            DB::table('payments')->where('id', $payment->getKey())->update([
+            DB::table('payments')->where('tenant_id', app(TenantContext::class)->id())
+                ->where('id', $payment->getKey())->update([
                 'year' => $validated['year'],
                 'month' => $validated['month'],
                 'token_no' => $validated['token_no'],
@@ -103,7 +106,8 @@ class PaymentDetailsController extends Controller
             $payment = Payment::whereKey($payment_id)->lockForUpdate()->firstOrFail();
             $statement = $this->lockStatement($payment->token_no, $payment->year, $payment->month);
 
-            DB::table('payments')->where('id', $payment_id)->delete();
+            DB::table('payments')->where('tenant_id', app(TenantContext::class)->id())
+                ->where('id', $payment_id)->delete();
             $this->refreshStatement($statement);
 
             return 1;

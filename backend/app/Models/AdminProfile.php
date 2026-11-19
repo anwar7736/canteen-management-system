@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToTenant;
 
 class AdminProfile extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
     protected $table = 'admin_profile';
     protected $fillable = ['shop_logo', 'shop_name', 'shop_address', 'shop_owner', 'owner_phone', 'owner_email', 'username'];
     public $timestamps = false;

@@ -41,6 +41,7 @@ class ConsoleQueryOptimizationTest extends TestCase
         $tomorrow = now('Asia/Dhaka')->addDay()->toDateString();
 
         DB::table('order_meals')->insert([
+            'tenant_id' => $orderedUser->tenant_id,
             'user_id' => $orderedUser->id,
             'token_no' => $orderedUser->token_no,
             'lunch' => 1,
@@ -149,6 +150,7 @@ class ConsoleQueryOptimizationTest extends TestCase
     ): void
     {
         DB::table('payments')->insert([
+            'tenant_id' => $user->tenant_id,
             'year' => $date->year,
             'month' => $date->format('F'),
             'name' => $user->name,

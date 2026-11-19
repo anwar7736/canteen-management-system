@@ -4,7 +4,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
     faBars, faBell, faBookOpen, faCartShopping, faChartLine,
     faChevronRight, faCoins, faEnvelope, faGear, faHouse,
-    faKey, faPowerOff, faUserGroup,
+    faKey, faPowerOff, faUserGroup, faCreditCard,
 } from '@fortawesome/free-solid-svg-icons';
 import Axios from 'axios';
 import API from './../api/api';
@@ -20,6 +20,7 @@ const navigation = [
     {to: '/admin/order_daily_meal', label: 'Meal orders', icon: faChevronRight},
     {to: '/admin/day_wise_meal_report', label: 'Meal reports', icon: faChartLine},
     {to: '/admin/daily_bazar_cost', label: 'Market costs', icon: faCoins},
+    {to: '/admin/billing', label: 'Subscription & billing', icon: faCreditCard},
 ];
 
 class SideBar extends Component {

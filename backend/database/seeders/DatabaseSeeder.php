@@ -23,5 +23,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             DailyMealItemSeeder::class,
         ]);
+        if (!app()->environment('production')) {
+            $this->call(DemoSaasSeeder::class);
+        }
     }
 }

@@ -201,6 +201,7 @@ class SslCommerzPaymentTest extends TestCase
     private function createStatement(User $user): void
     {
         DB::table('monthly_statements')->insert([
+            'tenant_id' => $user->tenant_id,
             'year' => 2026,
             'month' => 'November',
             'token_no' => $user->token_no,
@@ -219,6 +220,7 @@ class SslCommerzPaymentTest extends TestCase
     private function createPendingPayment(User $user, string $transactionId, float $amount): void
     {
         DB::table('payments')->insert([
+            'tenant_id' => $user->tenant_id,
             'year' => 2026,
             'month' => 'November',
             'name' => $user->name,

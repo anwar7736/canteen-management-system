@@ -14,13 +14,48 @@ use App\Http\Controllers\OrderMealController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\PaymentDetailsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PlatformAdminController;
+use App\Http\Controllers\PublicTenantController;
+use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\TenantRegistrationController;
+use App\Http\Controllers\TenantSignupVerificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:auth-login')->group(function () {
     Route::post('/login', [LoginController::class, 'onLogin']);
     Route::post('/admin_login', [LoginController::class, 'AdminLogin']);
+    Route::post('/platform/login', [LoginController::class, 'PlatformLogin']);
+    Route::post('/tenant/register', TenantRegistrationController::class);
 });
+Route::middleware('throttle:10,1')->prefix('tenant/register')->group(function () {
+    Route::post('/send-otp', [TenantSignupVerificationController::class, 'send']);
+    Route::post('/resend-otp', [TenantSignupVerificationController::class, 'send']);
+    Route::post('/verify-otp', [TenantSignupVerificationController::class, 'verify']);
+});
+Route::middleware('throttle:60,1')->get('/public/tenants', [PublicTenantController::class, 'index']);
+
+Route::middleware(['auth:sanctum', 'role:platform_admin'])->prefix('platform')->group(function () {
+    Route::get('/tenants', [PlatformAdminController::class, 'tenants']);
+    Route::post('/tenants', [PlatformAdminController::class, 'createTenant']);
+    Route::get('/tenants/{tenant}', [PlatformAdminController::class, 'showTenant']);
+    Route::patch('/tenants/{tenant}', [PlatformAdminController::class, 'updateTenant']);
+    Route::delete('/tenants/{tenant}', [PlatformAdminController::class, 'deleteTenant']);
+    Route::get('/tenants/{tenant}/users', [PlatformAdminController::class, 'users']);
+    Route::get('/tenants/{tenant}/impersonations', [PlatformAdminController::class, 'impersonations']);
+    Route::post('/tenants/{tenant}/users', [PlatformAdminController::class, 'createUser']);
+    Route::patch('/tenants/{tenant}/users/{userId}', [PlatformAdminController::class, 'updateUser']);
+    Route::delete('/tenants/{tenant}/users/{userId}', [PlatformAdminController::class, 'deleteUser']);
+    Route::post('/tenants/{tenant}/users/{userId}/password-reset', [PlatformAdminController::class, 'sendUserPasswordReset'])
+        ->middleware('throttle:password-reset');
+    Route::post('/impersonations', [PlatformAdminController::class, 'startImpersonation'])->middleware('throttle:10,1');
+    Route::post('/impersonations/{impersonation}/end', [PlatformAdminController::class, 'endImpersonation']);
+    Route::get('/payments', [PlatformAdminController::class, 'payments']);
+    Route::get('/plans', [PlatformAdminController::class, 'plans']);
+    Route::post('/plans', [PlatformAdminController::class, 'savePlan']);
+    Route::put('/plans/{plan}', [PlatformAdminController::class, 'savePlan']);
+});
+Route::middleware('auth:sanctum')->post('/impersonations/{impersonation}/end', [PlatformAdminController::class, 'endImpersonation']);
 
 Route::middleware('throttle:password-reset')->group(function () {
     Route::post('/EmailVerification', [PasswordController::class, 'EmailVerification']);
@@ -33,7 +68,7 @@ Route::get('/GetPublicProfileInfo', [AdminProfileController::class, 'GetPublicPr
 Route::get('/GetDailyMealItem', [DailyMealItemController::class, 'GetDayWiseMealItem']);
 Route::get('/GetMealRate', [MealRateController::class, 'GetMealRate']);
 
-Route::middleware(['auth:sanctum', 'role:user', 'owned.api'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:user', 'owned.api'])->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
 
     Route::get('/PaymentDetailsByUser/{token_no}', [PaymentDetailsController::class, 'PaymentDetailsByUser']);
@@ -56,7 +91,7 @@ Route::middleware(['auth:sanctum', 'role:user', 'owned.api'])->group(function ()
     Route::post('/UpdateProfile', [ProfileController::class, 'UpdateProfile']);
 });
 
-Route::middleware(['auth:sanctum', 'owned.api'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.member', 'owned.api'])->group(function () {
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()?->delete();
 
@@ -77,7 +112,13 @@ Route::middleware(['auth:sanctum', 'owned.api'])->group(function () {
     Route::get('/SetReadStatus/{user_id}/{notification_id}', [NotificationController::class, 'SetReadStatus']);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.member', 'role:admin'])->prefix('tenant')->group(function () {
+    Route::get('/plans', [SubscriptionController::class, 'plans']);
+    Route::get('/subscription', [SubscriptionController::class, 'current']);
+    Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout']);
+});
+
+Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:admin'])->group(function () {
     Route::get('/GetProfileInfo', [AdminProfileController::class, 'GetProfileInfo']);
     Route::get('/AdminDashboardSummary', [DashboardController::class, 'AdminDashboardSummary']);
 

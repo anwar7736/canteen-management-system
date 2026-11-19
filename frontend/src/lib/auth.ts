@@ -2,9 +2,10 @@ import type { NextAuthOptions, User } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { API_BACKEND_URL } from './server-api-base-url';
 
-type LoginRole = 'user' | 'admin';
+type LoginRole = 'user' | 'admin' | 'platform_admin';
 type LoginUser = User & {
   role: LoginRole;
+  tenantSlug?: string;
   email?: string | null;
   phone?: string;
   token_no?: string;
@@ -14,27 +15,41 @@ type LoginUser = User & {
 };
 
 async function authorizeLogin(credentials: Record<string, string>): Promise<LoginUser | null> {
-  const role = credentials.role === 'admin' ? 'admin' : 'user';
+  const role: LoginRole = credentials.role === 'platform_admin'
+    ? 'platform_admin'
+    : credentials.role === 'admin'
+      ? 'admin'
+      : 'user';
   const username = credentials.username?.trim();
   const password = credentials.password;
+  const tenantSlug = credentials.tenantSlug?.trim().toLowerCase();
 
   if (!username || !password) return null;
+  if (role !== 'platform_admin' && !tenantSlug) return null;
 
   try {
     let response: Response;
-    if (role === 'admin') {
+    if (role === 'platform_admin') {
+      response = await fetch(`${API_BACKEND_URL}platform/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        cache: 'no-store',
+      });
+    } else if (role === 'admin') {
       const body = new FormData();
       body.append('username', username);
       body.append('password', password);
       response = await fetch(`${API_BACKEND_URL}admin_login`, {
         method: 'POST',
+        headers: { 'X-Tenant-Slug': tenantSlug! },
         body,
         cache: 'no-store',
       });
     } else {
       response = await fetch(`${API_BACKEND_URL}login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug! },
         body: JSON.stringify({ username, password }),
         cache: 'no-store',
       });
@@ -65,15 +80,16 @@ async function authorizeLogin(credentials: Record<string, string>): Promise<Logi
         address: typeof record.address === 'string' ? record.address : undefined,
         apiToken: record.api_token,
       };
-    } else if (role === 'admin' && data && typeof data === 'object') {
+    } else if (role !== 'user' && data && typeof data === 'object') {
       const record = data as Record<string, unknown>;
-      if (record.id !== undefined && record.role === 'admin' && typeof record.api_token === 'string') {
+      if (record.id !== undefined && record.role === role && typeof record.api_token === 'string') {
         user = {
           id: String(record.id),
           name: username,
           email: typeof record.email === 'string' ? record.email : null,
           phone: typeof record.phone === 'string' ? record.phone : undefined,
           role,
+          tenantSlug,
           apiToken: record.api_token,
         };
       }
@@ -118,13 +134,19 @@ export const authOptions: NextAuthOptions = {
         token.photo = account.photo;
         token.address = account.address;
         token.apiToken = account.apiToken;
+        token.tenantSlug = account.tenantSlug;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub || '';
-        session.user.role = token.role === 'admin' ? 'admin' : 'user';
+        session.user.role = token.role === 'platform_admin'
+          ? 'platform_admin'
+          : token.role === 'admin'
+            ? 'admin'
+            : 'user';
+        session.user.tenantSlug = token.tenantSlug;
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.phone = token.phone;

@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\BelongsToTenant;
 
 class Payment extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     public const NON_SETTLED_STATUSES = ['Pending', 'Failed', 'Canceled'];
 

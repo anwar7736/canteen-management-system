@@ -7,6 +7,7 @@ use App\Models\MealRate;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\MonthlyStatement;
+use App\Tenancy\TenantContext;
 
 class OrderMealController extends Controller
 {
@@ -163,6 +164,7 @@ class OrderMealController extends Controller
                 else{
                     //Insert
                    $inserted = MonthlyStatement::insert([
+                                        'tenant_id' => app(TenantContext::class)->id(),
                                         'year'=>$summary['year'],
                                         'month'=>$summary['month'],
                                         'token_no' => $token_no,

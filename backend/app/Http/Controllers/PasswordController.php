@@ -22,25 +22,30 @@ class PasswordController extends Controller
         $user = User::where('email', $validated['email'])->first();
 
         if ($user) {
-            $otp = (string) random_int(100000, 999999);
-            $expiresAt = now()->addMinutes(5);
-
-            OTPModel::where('email', $user->email)->delete();
-            OTPModel::create([
-                'email' => $user->email,
-                'otp' => Hash::make($otp),
-                'time' => now()->format('H:i:s'),
-                'date' => now()->toDateString(),
-                'expires_at' => $expiresAt,
-            ]);
-
-            Mail::to($user->email)->send(new VerificationMail([
-                'name' => $user->name,
-                'otp' => $otp,
-            ]));
+            $this->sendPasswordResetFor($user);
         }
 
         return 1;
+    }
+
+    public function sendPasswordResetFor(User $user): void
+    {
+        $otp = (string) random_int(100000, 999999);
+        $expiresAt = now()->addMinutes(5);
+
+        OTPModel::where('email', $user->email)->delete();
+        OTPModel::create([
+            'email' => $user->email,
+            'otp' => Hash::make($otp),
+            'time' => now()->format('H:i:s'),
+            'date' => now()->toDateString(),
+            'expires_at' => $expiresAt,
+        ]);
+
+        Mail::to($user->email)->send(new VerificationMail([
+            'name' => $user->name,
+            'otp' => $otp,
+        ]));
     }
 
     public function GetOTPExpiration(Request $request)

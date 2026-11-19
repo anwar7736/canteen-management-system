@@ -14,6 +14,7 @@ import Notification from '../pages/Notification';
 import DayWiseMeal from '../pages/DayWiseMeal';
 import DailyBazar from '../pages/DailyBazar';
 import Settings from '../pages/Settings';
+import Billing from '../pages/Billing';
 
 
 import NotFound from '../pages/NotFound';
@@ -36,6 +37,7 @@ function AdminRoutes() {
       <Route path="notification" element={<Notification />} />
       <Route path="daily_bazar_cost" element={<DailyBazar />} />
       <Route path="settings" element={<Settings />} />
+      <Route path="billing" element={<Billing />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

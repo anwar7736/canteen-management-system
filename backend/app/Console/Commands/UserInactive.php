@@ -6,6 +6,8 @@ use Illuminate\Console\Command;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Models\Tenant;
+use App\Tenancy\TenantContext;
 
 class UserInactive extends Command
 {
@@ -24,24 +26,29 @@ class UserInactive extends Command
         $now = now('Asia/Dhaka');
         $firstDay = $now->copy()->startOfMonth()->toDateString();
         $lastDay = $now->copy()->endOfMonth()->toDateString();
-        $paymentsByToken = DB::table('payments')
-            ->whereNotIn('status', Payment::NON_SETTLED_STATUSES)
-            ->whereBetween('payment_date', [$firstDay, $lastDay])
-            ->select('token_no')
-            ->selectRaw('SUM(amount) as total_payment')
-            ->groupBy('token_no')
-            ->pluck('total_payment', 'token_no');
+        $tenantContext = app(TenantContext::class);
+        Tenant::query()->where('status', 'active')->eachById(function (Tenant $tenant) use ($tenantContext, $firstDay, $lastDay) {
+            $tenantContext->set($tenant);
+            $paymentsByToken = DB::table('payments')
+                ->where('tenant_id', $tenant->getKey())
+                ->whereNotIn('status', Payment::NON_SETTLED_STATUSES)
+                ->whereBetween('payment_date', [$firstDay, $lastDay])
+                ->select('token_no')
+                ->selectRaw('SUM(amount) as total_payment')
+                ->groupBy('token_no')
+                ->pluck('total_payment', 'token_no');
 
-        User::where('role', 'user')
-            ->select('id', 'token_no')
-            ->chunkById(500, function ($users) use ($paymentsByToken) {
-                $inactiveIds = $users
-                    ->filter(fn ($user) => (float) $paymentsByToken->get($user->token_no, 0) < 1500)
-                    ->pluck('id');
+            User::where('role', 'user')
+                ->select('id', 'token_no')
+                ->chunkById(500, function ($users) use ($paymentsByToken) {
+                    $inactiveIds = $users
+                        ->filter(fn ($user) => (float) $paymentsByToken->get($user->token_no, 0) < 1500)
+                        ->pluck('id');
 
-                if ($inactiveIds->isNotEmpty()) {
-                    User::whereIn('id', $inactiveIds)->update(['status' => 'inactive']);
-                }
-            });
+                    if ($inactiveIds->isNotEmpty()) {
+                        User::whereIn('id', $inactiveIds)->update(['status' => 'inactive']);
+                    }
+                });
+        });
     }
 }

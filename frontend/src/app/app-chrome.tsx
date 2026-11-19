@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { toast } from 'sonner';
 
 type InstallPromptEvent = Event & {
@@ -8,13 +9,52 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
 
-const installedStorageKey = 'canteen-pwa-installed';
+type PanelApp = {
+  id: string;
+  installLabel: string;
+  installedLabel: string;
+};
+
+function getPanelApp(pathname: string): PanelApp | null {
+  if (pathname === '/platform' || pathname.startsWith('/platform/')) {
+    return {
+      id: 'platform-admin',
+      installLabel: 'Install platform admin app',
+      installedLabel: 'Platform admin app is installed.',
+    };
+  }
+
+  const tenantMatch = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
+  if (!tenantMatch) return null;
+
+  const tenantSlug = decodeURIComponent(tenantMatch[1]);
+  const tenantPath = tenantMatch[2] || '/';
+  if (tenantPath === '/admin' || tenantPath.startsWith('/admin/')) {
+    return {
+      id: `tenant-admin:${tenantSlug}`,
+      installLabel: 'Install canteen admin app',
+      installedLabel: 'Canteen admin app is installed.',
+    };
+  }
+
+  return {
+    id: `member:${tenantSlug}`,
+    installLabel: 'Install member app',
+    installedLabel: 'Member app is installed.',
+  };
+}
 
 export default function AppChrome() {
+  const pathname = usePathname();
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState<boolean | null>(null);
+  const [installedPanelId, setInstalledPanelId] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const panelApp = getPanelApp(pathname || '/');
+  const panelId = panelApp?.id ?? null;
+  const installLabel = panelApp?.installLabel ?? '';
+  const installedLabel = panelApp?.installedLabel ?? '';
 
   useEffect(() => {
     const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 240);
@@ -27,29 +67,6 @@ export default function AppChrome() {
     setDark(enabled);
     document.documentElement.classList.toggle('dark', enabled);
 
-    const isInstalled =
-      ['standalone', 'minimal-ui', 'fullscreen'].some((mode) =>
-        window.matchMedia(`(display-mode: ${mode})`).matches
-      ) ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-      window.localStorage.getItem(installedStorageKey) === 'true';
-    setInstalled(isInstalled);
-
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      window.localStorage.removeItem(installedStorageKey);
-      setInstalled(false);
-      setInstallPrompt(event as InstallPromptEvent);
-    };
-    const handleInstalled = () => {
-      window.localStorage.setItem(installedStorageKey, 'true');
-      setInstalled(true);
-      setInstallPrompt(null);
-      toast.success('Canteen Management is installed.');
-    };
-
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
-    window.addEventListener('appinstalled', handleInstalled);
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
         console.error('Service worker registration failed:', error);
@@ -58,10 +75,41 @@ export default function AppChrome() {
 
     return () => {
       window.removeEventListener('scroll', updateScrollTopVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    setInstallPrompt(null);
+    if (!panelId) {
+      setInstalled(null);
+      setInstalledPanelId(null);
+      return;
+    }
+
+    const storageKey = `canteen-pwa-installed:${panelId}`;
+    setInstalled(window.localStorage.getItem(storageKey) === 'true');
+    setInstalledPanelId(panelId);
+
+    const handleInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      window.localStorage.removeItem(storageKey);
+      setInstalled(false);
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      window.localStorage.setItem(storageKey, 'true');
+      setInstalled(true);
+      setInstallPrompt(null);
+      toast.success(installedLabel);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+    window.addEventListener('appinstalled', handleInstalled);
+    return () => {
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
       window.removeEventListener('appinstalled', handleInstalled);
     };
-  }, []);
+  }, [installedLabel, panelId]);
 
   const toggleTheme = () => {
     const enabled = !dark;
@@ -78,8 +126,8 @@ export default function AppChrome() {
 
     await installPrompt.prompt();
     const choice = await installPrompt.userChoice;
-    if (choice.outcome === 'accepted') {
-      window.localStorage.setItem(installedStorageKey, 'true');
+    if (choice.outcome === 'accepted' && panelId) {
+      window.localStorage.setItem(`canteen-pwa-installed:${panelId}`, 'true');
       setInstalled(true);
     }
     setInstallPrompt(null);
@@ -107,10 +155,10 @@ export default function AppChrome() {
       >
         {dark ? '☀' : '☾'}
       </button>
-      {installed === false && (
+      {panelApp && installedPanelId === panelId && installed === false && (
         <button type="button" className="install-button" onClick={installApp}>
           <span aria-hidden="true">↓</span>
-          <span>Install app</span>
+          <span>{installLabel}</span>
         </button>
       )}
     </div>

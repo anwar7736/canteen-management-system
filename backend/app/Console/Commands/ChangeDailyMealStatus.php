@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\OrderMeal;
+use App\Models\Tenant;
+use App\Tenancy\TenantContext;
 
 class ChangeDailyMealStatus extends Command
 {
@@ -27,6 +29,10 @@ class ChangeDailyMealStatus extends Command
     public function handle()
     {
        $given_date = date('Y-m-d', strtotime("-1 day"));
-       OrderMeal::where(['meal_given_date'=>$given_date, 'status'=>'Processing'])->update(['status'=>'Pending']);
+       $tenantContext = app(TenantContext::class);
+       Tenant::query()->where('status', 'active')->eachById(function (Tenant $tenant) use ($tenantContext, $given_date) {
+           $tenantContext->set($tenant);
+           OrderMeal::where(['meal_given_date'=>$given_date, 'status'=>'Processing'])->update(['status'=>'Pending']);
+       });
     }
 }

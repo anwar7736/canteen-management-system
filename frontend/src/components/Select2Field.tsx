@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import $ from 'jquery';
-import initializeSelect2 from 'select2';
 
 type Select2FieldProps = {
   id?: string;
@@ -31,25 +30,36 @@ export default function Select2Field({
   }, [onChange]);
 
   useEffect(() => {
-    if (!selectRef.current) return;
-    if (typeof $.fn.select2 !== 'function') initializeSelect2(window, $);
-    const select = $(selectRef.current);
-    select.select2({ width: '100%' });
+    let disposed = false;
+    let select: JQuery | null = null;
     const handleChange = () => {
-      const selected = select.val();
+      const selected = select?.val();
       onChangeRef.current(typeof selected === 'string' ? selected : '');
     };
-    select.on('change.select2-react', handleChange);
+
+    async function initialize() {
+      const { default: initializeSelect2 } = await import('select2');
+      if (disposed || !selectRef.current) return;
+      if (typeof $.fn.select2 !== 'function') initializeSelect2(window, $);
+      select = $(selectRef.current);
+      select.select2({ width: '100%' });
+      select.on('change.select2-react', handleChange);
+    }
+
+    void initialize().catch((error: unknown) => {
+      console.error('Unable to initialize Select2:', error);
+    });
 
     return () => {
-      select.off('.select2-react');
-      if (select.hasClass('select2-hidden-accessible')) select.select2('destroy');
+      disposed = true;
+      select?.off('.select2-react');
+      if (select?.hasClass('select2-hidden-accessible')) select.select2('destroy');
     };
   }, []);
 
   useEffect(() => {
     if (selectRef.current) {
-      $(selectRef.current).val(value).trigger('change.select2');
+      $(selectRef.current).val(value).trigger('change');
     }
   }, [value]);
 
