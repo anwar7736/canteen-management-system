@@ -23,6 +23,12 @@ Axios.interceptors.request.use((config) => {
   const tenantMatch = window.location.pathname.match(/^\/t\/([^/]+)/);
   if (tenantMatch) {
     config.headers.set('X-Tenant-Slug', decodeURIComponent(tenantMatch[1]));
+  } else if (
+    window.location.pathname === '/admin' ||
+    window.location.pathname.startsWith('/admin/')
+  ) {
+    const tenantSlug = window.localStorage.getItem('tenant_slug');
+    if (tenantSlug) config.headers.set('X-Tenant-Slug', tenantSlug);
   }
 
   if (window.localStorage.getItem('demo_preview') !== 'true') return config;

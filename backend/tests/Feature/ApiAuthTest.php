@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\OTPModel;
 use App\Models\MonthlyStatement;
+use App\Models\MemberSignupVerification;
 use App\Models\Tenant;
 use App\Models\TenantSignupVerification;
 use App\Models\TenantSubscription;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
 use App\Mail\VerificationMail;
 use App\Mail\TenantSignupVerificationMail;
+use App\Mail\MemberSignupVerificationMail;
 use Tests\TestCase;
 
 class ApiAuthTest extends TestCase
@@ -369,6 +371,17 @@ class ApiAuthTest extends TestCase
     {
         $existingTenant = Tenant::query()->firstOrFail();
         $existingTenant->update(['name' => 'Beta Canteen', 'status' => 'active']);
+        DB::table('admin_profile')->updateOrInsert(
+            ['tenant_id' => $existingTenant->id],
+            [
+                'shop_name' => $existingTenant->name,
+                'shop_address' => 'Mirpur, Dhaka',
+                'shop_owner' => 'Beta Owner',
+                'username' => 'beta-owner',
+                'owner_phone' => '1200000021',
+                'owner_email' => 'beta-owner@example.test',
+            ]
+        );
         Tenant::create([
             'name' => 'Alpha Canteen',
             'slug' => 'alpha-canteen',
@@ -386,7 +399,91 @@ class ApiAuthTest extends TestCase
             ->assertJsonCount(2, 'tenants')
             ->assertJsonPath('tenants.0.slug', 'alpha-canteen')
             ->assertJsonPath('tenants.1.slug', $existingTenant->slug)
+            ->assertJsonPath('tenants.1.location', 'Mirpur, Dhaka')
             ->assertJsonMissing(['name' => 'Suspended Canteen']);
+    }
+
+    public function test_member_signup_verifies_email_and_creates_an_inactive_member_for_admin_approval(): void
+    {
+        Mail::fake();
+        $tenant = Tenant::query()->firstOrFail();
+        $email = 'member-self-signup@example.test';
+        $this->withoutHeader('X-Tenant-Slug')
+            ->postJson('/api/member/register/send-otp', [
+                'tenant_slug' => $tenant->slug,
+                'email' => $email,
+                'name' => 'Self Signup Member',
+            ])
+            ->assertOk();
+
+        $otp = null;
+        Mail::assertSent(MemberSignupVerificationMail::class, function (MemberSignupVerificationMail $mail) use (&$otp, $email, $tenant) {
+            $otp = $mail->otp;
+
+            return $mail->hasTo($email) && $mail->canteenName === $tenant->name;
+        });
+        $this->assertIsString($otp);
+
+        $this->postJson('/api/member/register/verify-otp', [
+            'tenant_slug' => $tenant->slug,
+            'email' => $email,
+            'otp' => $otp === '000000' ? '000001' : '000000',
+        ])->assertUnprocessable();
+
+        $signupToken = $this->postJson('/api/member/register/verify-otp', [
+            'tenant_slug' => $tenant->slug,
+            'email' => $email,
+            'otp' => $otp,
+        ])->assertOk()->json('signup_token');
+
+        $this->postJson('/api/member/register', [
+            'tenant_slug' => $tenant->slug,
+            'name' => 'Self Signup Member',
+            'username' => 'self-signup-member',
+            'email' => $email,
+            'phone' => '1900000011',
+            'password' => 'member-signup-password',
+            'password_confirmation' => 'member-signup-password',
+            'signup_token' => $signupToken,
+        ])->assertCreated()
+            ->assertJsonPath('message', 'Signup request received. The canteen admin must approve your account before you can sign in.');
+
+        $this->assertDatabaseHas('users', [
+            'tenant_id' => $tenant->id,
+            'username' => 'self-signup-member',
+            'email' => $email,
+            'role' => 'user',
+            'status' => 'inactive',
+        ]);
+        $this->assertNotNull(MemberSignupVerification::where('tenant_id', $tenant->id)
+            ->where('email', $email)
+            ->value('consumed_at'));
+
+        $this->postJson('/api/member/register', [
+            'tenant_slug' => $tenant->slug,
+            'name' => 'Self Signup Member',
+            'username' => 'another-self-signup-member',
+            'email' => 'replayed-member-signup@example.test',
+            'phone' => '1900000012',
+            'password' => 'member-signup-password',
+            'password_confirmation' => 'member-signup-password',
+            'signup_token' => $signupToken,
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Verify this email address before requesting membership.');
+    }
+
+    public function test_member_signup_rejects_suspended_canteens(): void
+    {
+        $tenant = Tenant::query()->firstOrFail();
+        $tenant->update(['status' => 'suspended']);
+
+        $this->withoutHeader('X-Tenant-Slug')
+            ->postJson('/api/member/register/send-otp', [
+                'tenant_slug' => $tenant->slug,
+                'email' => 'suspended-member@example.test',
+                'name' => 'Suspended Member',
+            ])
+            ->assertNotFound();
     }
 
     public function test_platform_impersonation_is_audited_expires_and_can_be_ended_by_target(): void

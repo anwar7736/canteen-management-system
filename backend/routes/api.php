@@ -8,6 +8,7 @@ use App\Http\Controllers\DayWiseMealController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\MealRateController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\MemberRegistrationController;
 use App\Http\Controllers\MonthlyStatementController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderMealController;
@@ -34,6 +35,12 @@ Route::middleware('throttle:10,1')->prefix('tenant/register')->group(function ()
     Route::post('/verify-otp', [TenantSignupVerificationController::class, 'verify']);
 });
 Route::middleware('throttle:60,1')->get('/public/tenants', [PublicTenantController::class, 'index']);
+Route::middleware('throttle:10,1')->prefix('member/register')->group(function () {
+    Route::post('/send-otp', [MemberRegistrationController::class, 'sendVerificationCode']);
+    Route::post('/resend-otp', [MemberRegistrationController::class, 'sendVerificationCode']);
+    Route::post('/verify-otp', [MemberRegistrationController::class, 'verifyEmail']);
+    Route::post('/', [MemberRegistrationController::class, 'register']);
+});
 
 Route::middleware(['auth:sanctum', 'role:platform_admin'])->prefix('platform')->group(function () {
     Route::get('/tenants', [PlatformAdminController::class, 'tenants']);

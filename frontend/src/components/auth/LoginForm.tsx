@@ -158,6 +158,7 @@ export default function LoginForm({ role }: { role: LoginRole }) {
         localStorage.setItem('id', user.id);
         localStorage.setItem('email', user.email || '');
         localStorage.setItem('phone', user.phone || '');
+        localStorage.setItem('tenant_slug', tenantSlug.trim().toLowerCase());
       } else {
         localStorage.setItem('login', 'true');
         localStorage.setItem('id', user.id);
@@ -295,6 +296,11 @@ export default function LoginForm({ role }: { role: LoginRole }) {
         <Link className="auth-forgot" href={isAdmin ? '/admin/email_verification' : '/email_verification'}>
           Forgot password?
         </Link>
+        {!isAdmin && (
+          <p className="mt-4 text-center text-sm text-[var(--text-secondary)]">
+            Need an account? <Link href="/member-signup">Sign up as a member</Link>
+          </p>
+        )}
         {!isAdmin && demoPreviewEnabled && (
           <button className="auth-demo-button" type="button" onClick={enterDemoPreview}>
             Browse user panel demo

@@ -61,7 +61,7 @@ class SideBar extends Component {
             console.error('Unable to revoke API session:', error);
         }
         await signOut({redirect: false});
-        ['id', 'email', 'login', 'phone'].forEach((key) => localStorage.removeItem(key));
+        ['id', 'email', 'login', 'phone', 'tenant_slug'].forEach((key) => localStorage.removeItem(key));
         this.setState({redirectStatus: true});
     };
 

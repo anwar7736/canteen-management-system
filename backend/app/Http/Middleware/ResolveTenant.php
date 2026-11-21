@@ -24,6 +24,8 @@ class ResolveTenant
         if (
             $request->is('api/tenant/register') ||
             $request->is('api/tenant/register/*') ||
+            $request->is('api/member/register') ||
+            $request->is('api/member/register/*') ||
             $request->is('api/public/tenants')
         ) {
             return $next($request);

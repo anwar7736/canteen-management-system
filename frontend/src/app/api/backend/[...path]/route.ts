@@ -21,6 +21,10 @@ const publicPostRoutes = new Set([
   'tenant/register/send-otp',
   'tenant/register/resend-otp',
   'tenant/register/verify-otp',
+  'member/register/send-otp',
+  'member/register/resend-otp',
+  'member/register/verify-otp',
+  'member/register',
   'platform/login',
 ]);
 const allowedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
@@ -75,6 +79,12 @@ async function proxyRequest(
     'tenant/register/resend-otp',
     'tenant/register/verify-otp',
   ].includes(routeKey) && method === 'POST';
+  const isMemberSignup = [
+    'member/register/send-otp',
+    'member/register/resend-otp',
+    'member/register/verify-otp',
+    'member/register',
+  ].includes(routeKey) && method === 'POST';
   const isPublicTenantDirectory = routeKey === 'public/tenants' && method === 'GET';
   if (!isPublic && !isPlatformRoute && sessionToken?.role === 'platform_admin') {
     return NextResponse.json({ message: 'A tenant account is required.' }, { status: 403 });
@@ -106,7 +116,7 @@ async function proxyRequest(
       { status: 401, headers: { 'Cache-Control': 'no-store' } }
     );
   }
-  if (!isPlatformRoute && !isTenantRegistration && !isTenantSignupVerification && !isPublicTenantDirectory && !tenantSlug) {
+  if (!isPlatformRoute && !isTenantRegistration && !isTenantSignupVerification && !isMemberSignup && !isPublicTenantDirectory && !tenantSlug) {
     return NextResponse.json(
       { message: 'A tenant slug is required.' },
       { status: 400, headers: { 'Cache-Control': 'no-store' } }
