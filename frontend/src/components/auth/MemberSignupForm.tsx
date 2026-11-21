@@ -362,13 +362,7 @@ export default function MemberSignupForm() {
                   disabled={location.trim().length < 2 || filteredTenants.length === 0 || Boolean(tenantsError)}
                   ariaLabel="Canteen"
                 >
-                  <option value="">
-                    {location.trim().length < 2
-                      ? 'Enter a city or area first'
-                      : filteredTenants.length
-                        ? 'Select your canteen'
-                        : 'No canteens found in this area'}
-                  </option>
+                  <option value="">Select a canteen</option>
                   {filteredTenants.map((tenant) => (
                     <option key={tenant.slug} value={tenant.slug}>
                       {tenant.name} — {tenant.location}
@@ -378,6 +372,16 @@ export default function MemberSignupForm() {
               )}
               {errors.tenant_slug && <p className="field-error" role="alert">{errors.tenant_slug}</p>}
               {tenantsError && <p className="field-error" role="alert">{tenantsError}</p>}
+              {!tenantsLoading && !tenantsError && location.trim().length >= 2 && filteredTenants.length > 0 && (
+                <p className="mt-1 text-sm text-[var(--text-secondary)]" role="status">
+                  {filteredTenants.length} canteen{filteredTenants.length === 1 ? '' : 's'} found for “{location.trim()}”. Open the list to choose.
+                </p>
+              )}
+              {!tenantsLoading && !tenantsError && location.trim().length >= 2 && filteredTenants.length === 0 && (
+                <p className="mt-1 text-sm text-[var(--text-secondary)]" role="status">
+                  No canteens found for “{location.trim()}”. Try another city or area.
+                </p>
+              )}
               {!tenantsLoading && !tenantsError && tenants.length === 0 && (
                 <p className="field-error" role="status">No active canteens are available for signup.</p>
               )}
