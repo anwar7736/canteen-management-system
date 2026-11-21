@@ -24,21 +24,32 @@ function getPanelApp(pathname: string): PanelApp | null {
     };
   }
 
-  const tenantMatch = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
-  if (!tenantMatch) return null;
-
-  const tenantSlug = decodeURIComponent(tenantMatch[1]);
-  const tenantPath = tenantMatch[2] || '/';
-  if (tenantPath === '/admin' || tenantPath.startsWith('/admin/')) {
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return {
-      id: `tenant-admin:${tenantSlug}`,
+      id: 'canteen-admin',
       installLabel: 'Install canteen admin app',
       installedLabel: 'Canteen admin app is installed.',
     };
   }
 
+  const tenantMatch = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
+  if (!tenantMatch) {
+    return pathname === '/' || pathname === '/login'
+      ? {
+          id: 'canteen-member',
+          installLabel: 'Install member app',
+          installedLabel: 'Member app is installed.',
+        }
+      : null;
+  }
+
+  const tenantPath = tenantMatch[2] || '/';
+  if (tenantPath === '/admin' || tenantPath.startsWith('/admin/')) {
+    return null;
+  }
+
   return {
-    id: `member:${tenantSlug}`,
+    id: 'canteen-member',
     installLabel: 'Install member app',
     installedLabel: 'Member app is installed.',
   };

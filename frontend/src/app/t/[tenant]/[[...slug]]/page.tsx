@@ -6,23 +6,13 @@ export async function generateMetadata({
 }: {
   params: Promise<{ tenant: string; slug?: string[] }>;
 }): Promise<Metadata> {
-  const { tenant, slug } = await params;
-  const tenantPath = `/t/${encodeURIComponent(tenant)}`;
+  const { slug } = await params;
   const isAdmin = slug?.[0] === 'admin';
-  const appName = isAdmin
-    ? `Canteen Admin · ${tenant}`
-    : `${tenant} Member`;
 
   return {
     manifest: isAdmin
-      ? `${tenantPath}/admin/manifest.webmanifest`
-      : `${tenantPath}/manifest.webmanifest`,
-    applicationName: appName,
-    appleWebApp: {
-      capable: true,
-      statusBarStyle: 'default',
-      title: isAdmin ? `${tenant.slice(0, 7)} Admin` : `${tenant.slice(0, 7)} Member`,
-    },
+      ? '/admin/manifest.webmanifest'
+      : '/manifest.json',
   };
 }
 

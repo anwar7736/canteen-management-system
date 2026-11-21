@@ -175,7 +175,7 @@ export default function LoginForm({ role }: { role: LoginRole }) {
 
       const workspace = `/t/${encodeURIComponent(tenantSlug.trim().toLowerCase())}`;
       const callbackPath = getCallbackPath(searchParams.get('callbackUrl'), role);
-      router.replace(`${workspace}${callbackPath === '/' ? '' : callbackPath}`);
+      router.replace(isAdmin ? callbackPath : `${workspace}${callbackPath === '/' ? '' : callbackPath}`);
     } catch (error) {
       console.error(`${isAdmin ? 'Admin' : 'User'} sign-in failed:`, error);
       setAuthError('Something went wrong. Please try again.');

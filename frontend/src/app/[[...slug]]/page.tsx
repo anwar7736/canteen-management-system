@@ -1,5 +1,26 @@
+import type { Metadata } from 'next';
 import LegacyApp from '../legacy-app';
 import Link from 'next/link';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug?: string[] }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  if (slug?.[0] === 'admin') {
+    return {
+      manifest: '/admin/manifest.webmanifest',
+      applicationName: 'Canteen Admin',
+      appleWebApp: {
+        capable: true,
+        statusBarStyle: 'default',
+        title: 'Canteen Admin',
+      },
+    };
+  }
+  return {};
+}
 
 export default async function AppPage({
   params,

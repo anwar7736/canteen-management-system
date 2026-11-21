@@ -8,12 +8,12 @@ export async function generateMetadata({
   const { tenant } = await params;
 
   return {
-    manifest: `/t/${encodeURIComponent(tenant)}/manifest.webmanifest`,
-    applicationName: `${tenant} Member`,
+    manifest: '/manifest.json',
+    applicationName: 'Canteen Member',
     appleWebApp: {
       capable: true,
       statusBarStyle: 'default',
-      title: `${tenant.slice(0, 7)} Member`,
+      title: 'Canteen Member',
     },
   };
 }

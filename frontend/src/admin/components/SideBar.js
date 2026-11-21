@@ -35,6 +35,8 @@ class SideBar extends Component {
     }
 
     componentDidMount() {
+        if (!localStorage.getItem('login')) return;
+
         const user_id = localStorage.getItem('id');
         this.setState({user_id});
         Axios.get(API.CountLastest + user_id)
@@ -77,6 +79,15 @@ class SideBar extends Component {
         const {countLatest, sideNav, redirectStatus} = this.state;
         const isAuthenticated = Boolean(localStorage.getItem('login'));
         const shopName = localStorage.getItem('shop_name') || 'Canteen workspace';
+
+        if (!isAuthenticated) {
+            return (
+                <Fragment>
+                    {this.props.children}
+                    {redirectStatus && <Navigate to="/admin/login" replace/>}
+                </Fragment>
+            );
+        }
 
         return (
             <Fragment>

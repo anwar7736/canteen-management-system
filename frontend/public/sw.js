@@ -1,6 +1,8 @@
 const CACHE_NAME = 'canteen-shell-v2';
 const APP_SHELL = [
   '/manifest.json',
+  '/admin/manifest.webmanifest',
+  '/platform/manifest.webmanifest',
   '/offline.html',
   '/canteen-icon.svg',
   '/apple-touch-icon.png',

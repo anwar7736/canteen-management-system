@@ -14,19 +14,22 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const tenantMatch = pathname.match(/^\/t\/([^/]+)(\/.*)?$/);
   const isPlatformRoute = pathname === '/platform' || pathname.startsWith('/platform/');
+  const isRootAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
 
-  if (!tenantMatch && !isPlatformRoute) return NextResponse.next();
+  if (!tenantMatch && !isPlatformRoute && !isRootAdminRoute) return NextResponse.next();
 
   const tenantSlug = tenantMatch ? decodeURIComponent(tenantMatch[1]) : null;
   const tenantPath = tenantMatch ? tenantMatch[2] || '/' : pathname;
-  const isAdminRoute = isPlatformRoute || tenantPath === '/admin' || tenantPath.startsWith('/admin/');
+  const isAdminRoute = isPlatformRoute || isRootAdminRoute || tenantPath === '/admin' || tenantPath.startsWith('/admin/');
+  const isPublicRootAdminPath = isRootAdminRoute && (
+    publicAdminPaths.includes(pathname) ||
+    pathname === '/admin/manifest.webmanifest'
+  );
   const isPublicTenantPath = tenantMatch && (
     tenantPath === '/login' ||
     tenantPath === '/email_verification' ||
     tenantPath === '/otp_verification' ||
     tenantPath === '/reset_password' ||
-    tenantPath === '/manifest.webmanifest' ||
-    tenantPath === '/admin/manifest.webmanifest' ||
     publicAdminPaths.some((path) => tenantPath === path)
   );
   const isPublicPlatformPath = isPlatformRoute && (
@@ -34,7 +37,7 @@ export async function proxy(request: NextRequest) {
     pathname === '/platform/manifest.webmanifest'
   );
 
-  if (isPublicTenantPath || isPublicPlatformPath) return NextResponse.next();
+  if (isPublicRootAdminPath || isPublicTenantPath || isPublicPlatformPath) return NextResponse.next();
   if (tenantMatch && !isAdminRoute && demoPreviewEnabled) return NextResponse.next();
 
   const token = await getToken({
@@ -59,14 +62,19 @@ export async function proxy(request: NextRequest) {
   }
   if (
     token?.role === expectedRole &&
-    (isPlatformRoute || token.tenantSlug === tenantSlug)
+    (
+      isPlatformRoute ||
+      (tenantSlug ? token.tenantSlug === tenantSlug : isRootAdminRoute && typeof token.tenantSlug === 'string')
+    )
   ) {
     return NextResponse.next();
   }
 
   const signInPath = isPlatformRoute
     ? '/platform/login'
-    : `${tenantMatch?.[0]}${isAdminRoute ? '/admin/login' : '/login'}`;
+    : isRootAdminRoute
+      ? '/admin/login'
+      : `${tenantMatch?.[0]}${isAdminRoute ? '/admin/login' : '/login'}`;
   const signInUrl = new URL(signInPath, request.url);
   signInUrl.searchParams.set('callbackUrl', tenantMatch ? tenantPath : pathname);
   return NextResponse.redirect(signInUrl);
@@ -74,6 +82,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/admin/:path*',
     '/t/:path*',
     '/platform/:path*',
   ],
