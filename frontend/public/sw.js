@@ -1,4 +1,4 @@
-const CACHE_NAME = 'canteen-shell-v2';
+const CACHE_NAME = 'canteen-shell-v3';
 const APP_SHELL = [
   '/manifest.json',
   '/admin/manifest.webmanifest',

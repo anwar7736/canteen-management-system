@@ -32,6 +32,8 @@ export function createPanelManifest({
     categories: ['business', 'productivity'],
     icons: [
       { src: '/canteen-icon.svg', sizes: 'any', type: 'image/svg+xml' },
+      { src: '/logo192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/logo512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   };
