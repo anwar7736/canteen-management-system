@@ -83,7 +83,7 @@ class SideBar extends Component {
         if (!isAuthenticated) {
             return (
                 <Fragment>
-                    {this.props.children}
+                    <main className="admin-auth-page">{this.props.children}</main>
                     {redirectStatus && <Navigate to="/admin/login" replace/>}
                 </Fragment>
             );

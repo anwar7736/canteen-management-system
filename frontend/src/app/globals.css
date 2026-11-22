@@ -100,7 +100,7 @@ a:hover {
 
 .auth-page {
   display: grid;
-  min-height: calc(100vh - 84px);
+  min-height: 100vh;
   place-items: center;
   padding: clamp(20px, 5vw, 48px);
 }
@@ -612,6 +612,10 @@ html.dark .auth-error {
   padding: calc(var(--topbar-height) + var(--preview-banner-offset) + 22px) 30px 18px;
 }
 
+.user-shell:not(.is-authenticated) + .user-page-main {
+  padding-top: calc(var(--preview-banner-offset) + 22px);
+}
+
 .user-page-main > :not(.footer):not(main) {
   max-width: 1440px;
   margin-right: auto;
@@ -672,6 +676,15 @@ html.dark .auth-error {
   min-height: 100vh;
   margin-left: var(--sidebar-width);
   padding: 100px 30px 40px;
+}
+
+.admin-auth-page {
+  min-height: 100vh;
+  padding: 24px 16px 40px;
+}
+
+.admin-auth-page > .login-page-card {
+  margin-top: 0;
 }
 
 .admin-app-main > * {
@@ -1394,6 +1407,10 @@ a:focus-visible {
 
   .user-page-main {
     padding: calc(var(--topbar-height) + var(--preview-banner-offset) + 16px) 16px 16px;
+  }
+
+  .user-shell:not(.is-authenticated) + .user-page-main {
+    padding-top: calc(var(--preview-banner-offset) + 16px);
   }
 
   .user-page-main > main {

@@ -75,7 +75,7 @@ function NavigationBar() {
     };
 
     return (
-        <div className="user-shell">
+        <div className={`user-shell${login ? ' is-authenticated' : ''}`}>
             <aside className={`user-sidebar ${sideNav ? 'is-open' : ''}`} aria-label="User navigation">
                 <div className="brand-lockup">
                     <div className="brand-mark">
