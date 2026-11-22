@@ -16,7 +16,6 @@ class TenantRegistrationController extends Controller
     {
         $validated = $request->validate([
             'tenant_name' => ['required', 'string', 'max:255'],
-            'tenant_slug' => ['required', 'string', 'min:3', 'max:63', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'unique:tenants,slug'],
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],

@@ -20,7 +20,7 @@ class CreateTenantWorkspace
         return DB::transaction(function () use ($attributes, $plan, $issueApiToken) {
             $tenant = Tenant::create([
                 'name' => $attributes['tenant_name'],
-                'slug' => Str::lower($attributes['tenant_slug']),
+                'slug' => Str::lower($attributes['tenant_slug'] ?? $this->uniqueSlug($attributes['tenant_name'])),
                 'status' => 'active',
             ]);
             app(TenantContext::class)->set($tenant);
@@ -82,5 +82,22 @@ class CreateTenantWorkspace
         } while (User::where('token_no', $tokenNumber)->exists());
 
         return $tokenNumber;
+    }
+
+    private function uniqueSlug(string $name): string
+    {
+        $baseSlug = trim(substr(Str::slug($name), 0, 63), '-');
+        if ($baseSlug === '') {
+            $baseSlug = 'canteen';
+        }
+
+        $slug = $baseSlug;
+        $suffix = 2;
+        while (Tenant::query()->where('slug', $slug)->exists()) {
+            $ending = '-'.$suffix++;
+            $slug = rtrim(substr($baseSlug, 0, 63 - strlen($ending)), '-').$ending;
+        }
+
+        return $slug;
     }
 }

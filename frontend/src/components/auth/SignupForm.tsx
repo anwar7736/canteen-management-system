@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import PasswordField from '../PasswordField';
 
 type RegistrationErrors = Partial<Record<
-  'tenant_name' | 'tenant_slug' | 'name' | 'username' | 'email' | 'phone' | 'password' | 'password_confirmation' | 'otp',
+  'tenant_name' | 'name' | 'username' | 'email' | 'phone' | 'password' | 'password_confirmation' | 'otp',
   string
 >>;
 
@@ -38,7 +38,6 @@ export default function SignupForm() {
   const router = useRouter();
   const [values, setValues] = useState({
     tenant_name: '',
-    tenant_slug: '',
     name: '',
     username: '',
     email: '',
@@ -80,7 +79,6 @@ export default function SignupForm() {
   function validateDetails(): RegistrationErrors {
     const nextErrors: RegistrationErrors = {};
     if (!values.tenant_name.trim()) nextErrors.tenant_name = 'Enter a canteen name.';
-    if (!values.tenant_slug.trim()) nextErrors.tenant_slug = 'Enter a workspace slug.';
     if (!values.name.trim()) nextErrors.name = 'Enter your name.';
     if (!values.username.trim()) nextErrors.username = 'Enter a username.';
     if (!values.email.trim()) nextErrors.email = 'Enter your email.';
@@ -193,14 +191,12 @@ export default function SignupForm() {
         setSignupToken(verifiedToken);
       }
 
-      const tenantSlug = values.tenant_slug.trim().toLowerCase();
       const response = await fetch('/api/backend/tenant/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
           ...values,
           email: values.email.trim().toLowerCase(),
-          tenant_slug: tenantSlug,
           signup_token: verifiedToken,
         }),
       });
@@ -219,6 +215,7 @@ export default function SignupForm() {
         throw new Error('The workspace registration response was invalid.');
       }
       const registration = result as SignupResult;
+      const tenantSlug = registration.tenant.slug;
       const signInResult = await signIn('credentials', {
         redirect: false,
         role: 'admin',
@@ -268,7 +265,7 @@ export default function SignupForm() {
         <h1 id="signup-title">Create your canteen workspace</h1>
         <p className="auth-description">
           {step === 'details'
-            ? 'Your workspace URL will be /t/your-slug.'
+            ? 'Your workspace URL will be generated automatically from your canteen name.'
             : `Enter the six-digit code sent to ${values.email.trim().toLowerCase()}.`}
         </p>
         {formError && <p className="auth-error" role="alert">{formError}</p>}
@@ -281,15 +278,6 @@ export default function SignupForm() {
                 aria-invalid={Boolean(errors.tenant_name)} aria-describedby={errors.tenant_name ? 'tenant-name-error' : undefined}
                 value={values.tenant_name} onChange={(event) => update('tenant_name', event.target.value)} required />
               {fieldError('tenant_name', 'tenant-name')}
-            </div>
-            <div className="auth-field">
-              <label htmlFor="tenant-slug">Workspace slug</label>
-              <input id="tenant-slug" className={`form-control${errors.tenant_slug ? ' is-invalid' : ''}`}
-                aria-invalid={Boolean(errors.tenant_slug)} aria-describedby={errors.tenant_slug ? 'tenant-slug-error' : undefined}
-                value={values.tenant_slug}
-                onChange={(event) => update('tenant_slug', event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                placeholder="my-canteen" autoCapitalize="none" required />
-              {fieldError('tenant_slug', 'tenant-slug')}
             </div>
             <div className="auth-field">
               <label htmlFor="owner-name">Your name</label>

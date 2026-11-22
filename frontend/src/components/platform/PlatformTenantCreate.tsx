@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 type Plan = { id: number; name: string; price: string | number; currency: string };
 type FormValues = {
   tenant_name: string;
-  tenant_slug: string;
   name: string;
   username: string;
   email: string;
@@ -28,7 +27,6 @@ export default function PlatformTenantCreate() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [values, setValues] = useState<FormValues>({
     tenant_name: '',
-    tenant_slug: '',
     name: '',
     username: '',
     email: '',
@@ -75,7 +73,6 @@ export default function PlatformTenantCreate() {
     event.preventDefault();
     const nextErrors: FormErrors = {};
     if (!values.tenant_name.trim()) nextErrors.tenant_name = 'Enter a canteen name.';
-    if (!values.tenant_slug.trim()) nextErrors.tenant_slug = 'Enter a workspace slug.';
     if (!values.name.trim()) nextErrors.name = 'Enter the owner name.';
     if (!values.username.trim()) nextErrors.username = 'Enter a username.';
     if (!values.email.trim()) nextErrors.email = 'Enter an email address.';
@@ -99,7 +96,6 @@ export default function PlatformTenantCreate() {
         body: JSON.stringify({
           ...values,
           tenant_name: values.tenant_name.trim(),
-          tenant_slug: values.tenant_slug.trim().toLowerCase(),
           name: values.name.trim(),
           username: values.username.trim(),
           email: values.email.trim(),
@@ -144,7 +140,9 @@ export default function PlatformTenantCreate() {
       <div className="mx-auto max-w-4xl">
         <Link href="/platform" className="text-sm text-emerald-300 hover:text-emerald-200">← Back to platform</Link>
         <h1 className="mt-4 text-3xl font-bold">Create a canteen workspace</h1>
-        <p className="mt-2 text-sm text-slate-400">Create a tenant and its initial administrator account.</p>
+        <p className="mt-2 text-sm text-slate-400">
+          Create a tenant and its initial administrator account. The workspace URL is generated from the canteen name.
+        </p>
         {pageError && <p className="mt-5 rounded-xl bg-red-950 px-4 py-3 text-red-200" role="alert">{pageError}</p>}
 
         <form noValidate onSubmit={submit} className="mt-6 grid gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2">
@@ -155,14 +153,6 @@ export default function PlatformTenantCreate() {
               aria-describedby={errors.tenant_name ? 'tenant-name-error' : undefined}
               onChange={(event) => update('tenant_name', event.target.value)} />
             {fieldError('tenant_name', 'tenant-name')}
-          </div>
-          <div className="auth-field">
-            <label htmlFor="tenant-slug">Workspace slug</label>
-            <input id="tenant-slug" className={`form-control${errors.tenant_slug ? ' is-invalid' : ''}`}
-              value={values.tenant_slug} aria-invalid={Boolean(errors.tenant_slug)}
-              aria-describedby={errors.tenant_slug ? 'tenant-slug-error' : undefined}
-              onChange={(event) => update('tenant_slug', event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
-            {fieldError('tenant_slug', 'tenant-slug')}
           </div>
           <div className="auth-field">
             <label htmlFor="owner-name">Initial administrator name</label>

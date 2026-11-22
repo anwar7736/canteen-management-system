@@ -295,7 +295,6 @@ class ApiAuthTest extends TestCase
         $createdWorkspace = $this->withToken($token)
             ->postJson('/api/platform/tenants', [
                 'tenant_name' => 'Platform Created Canteen',
-                'tenant_slug' => 'platform-created-canteen',
                 'name' => 'Workspace owner',
                 'username' => 'workspace-owner',
                 'email' => 'workspace-owner@example.test',
@@ -305,6 +304,7 @@ class ApiAuthTest extends TestCase
                 'plan_id' => $plan->id,
             ])
             ->assertCreated()
+            ->assertJsonPath('tenant.slug', 'platform-created-canteen')
             ->json('tenant');
 
         $this->withToken($token)
@@ -318,6 +318,11 @@ class ApiAuthTest extends TestCase
     public function test_public_tenant_registration_still_creates_a_workspace_and_owner_token(): void
     {
         Mail::fake();
+        Tenant::create([
+            'name' => 'Existing Public Signup Canteen',
+            'slug' => 'public-signup-canteen',
+            'status' => 'active',
+        ]);
         $email = 'public-signup-owner@example.test';
         $this->postJson('/api/tenant/register/send-otp', [
             'email' => $email,
@@ -344,7 +349,6 @@ class ApiAuthTest extends TestCase
 
         $response = $this->postJson('/api/tenant/register', [
             'tenant_name' => 'Public Signup Canteen',
-            'tenant_slug' => 'public-signup-canteen',
             'name' => 'Public Signup Owner',
             'username' => 'public-signup-owner',
             'email' => $email,
@@ -353,7 +357,7 @@ class ApiAuthTest extends TestCase
             'password_confirmation' => 'very-secure-password',
             'signup_token' => $signupToken,
         ])->assertCreated()
-            ->assertJsonPath('tenant.slug', 'public-signup-canteen')
+            ->assertJsonPath('tenant.slug', 'public-signup-canteen-2')
             ->assertJsonPath('user.role', 'admin');
 
         $tenantId = $response->json('tenant.id');
@@ -370,7 +374,6 @@ class ApiAuthTest extends TestCase
 
         $this->postJson('/api/tenant/register', [
             'tenant_name' => 'Another Signup Canteen',
-            'tenant_slug' => 'another-signup-canteen',
             'name' => 'Another Signup Owner',
             'username' => 'another-signup-owner',
             'email' => $email,
