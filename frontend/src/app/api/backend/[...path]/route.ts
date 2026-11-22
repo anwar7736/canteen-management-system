@@ -25,6 +25,7 @@ const publicPostRoutes = new Set([
   'member/register/resend-otp',
   'member/register/verify-otp',
   'member/register',
+  'login/tenant-options',
   'platform/login',
 ]);
 const allowedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
@@ -86,6 +87,7 @@ async function proxyRequest(
     'member/register',
   ].includes(routeKey) && method === 'POST';
   const isPublicTenantDirectory = routeKey === 'public/tenants' && method === 'GET';
+  const isPublicLoginTenantOptions = routeKey === 'login/tenant-options' && method === 'POST';
   if (!isPublic && !isPlatformRoute && sessionToken?.role === 'platform_admin') {
     return NextResponse.json({ message: 'A tenant account is required.' }, { status: 403 });
   }
@@ -116,7 +118,7 @@ async function proxyRequest(
       { status: 401, headers: { 'Cache-Control': 'no-store' } }
     );
   }
-  if (!isPlatformRoute && !isTenantRegistration && !isTenantSignupVerification && !isMemberSignup && !isPublicTenantDirectory && !tenantSlug) {
+  if (!isPlatformRoute && !isTenantRegistration && !isTenantSignupVerification && !isMemberSignup && !isPublicTenantDirectory && !isPublicLoginTenantOptions && !tenantSlug) {
     return NextResponse.json(
       { message: 'A tenant slug is required.' },
       { status: 400, headers: { 'Cache-Control': 'no-store' } }

@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:auth-login')->group(function () {
+    Route::post('/login/tenant-options', [LoginController::class, 'tenantOptions']);
     Route::post('/login', [LoginController::class, 'onLogin']);
     Route::post('/admin_login', [LoginController::class, 'AdminLogin']);
     Route::post('/platform/login', [LoginController::class, 'PlatformLogin']);

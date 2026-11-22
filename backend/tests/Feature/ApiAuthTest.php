@@ -62,6 +62,90 @@ class ApiAuthTest extends TestCase
         ])->assertOk()->assertSeeText('0');
     }
 
+    public function test_login_tenant_options_only_return_workspaces_with_matching_credentials(): void
+    {
+        $tenants = collect([
+            Tenant::create(['name' => 'First Login Canteen', 'slug' => 'first-login-canteen', 'status' => 'active']),
+            Tenant::create(['name' => 'Second Login Canteen', 'slug' => 'second-login-canteen', 'status' => 'active']),
+            Tenant::create(['name' => 'Wrong Password Canteen', 'slug' => 'wrong-password-canteen', 'status' => 'active']),
+            Tenant::create(['name' => 'Inactive Member Canteen', 'slug' => 'inactive-member-canteen', 'status' => 'active']),
+            Tenant::create(['name' => 'Suspended Login Canteen', 'slug' => 'suspended-login-canteen', 'status' => 'suspended']),
+        ]);
+        $createAccount = function (
+            Tenant $tenant,
+            string $role,
+            string $username,
+            string $email,
+            string $password = 'correct-password',
+            string $status = 'active'
+        ): User {
+            app(TenantContext::class)->set($tenant);
+
+            return User::create([
+                'name' => $username,
+                'username' => $username,
+                'email' => $email,
+                'phone' => random_int(1000000000, 9999999999),
+                'token_no' => random_int(111111, 999999),
+                'role' => $role,
+                'status' => $status,
+                'password' => Hash::make($password),
+            ]);
+        };
+
+        $createAccount($tenants[0], 'user', 'shared-member', 'member@example.test');
+        $createAccount($tenants[1], 'user', 'shared-member', 'member@example.test');
+        $createAccount($tenants[2], 'user', 'shared-member', 'member@example.test', 'different-password');
+        $createAccount($tenants[3], 'user', 'shared-member', 'member@example.test', 'correct-password', 'inactive');
+        $createAccount($tenants[4], 'user', 'shared-member', 'member@example.test');
+        $createAccount($tenants[0], 'admin', 'shared-admin', 'admin@example.test');
+        $createAccount($tenants[1], 'admin', 'shared-admin', 'admin@example.test');
+
+        $this->withoutHeader('X-Tenant-Slug')
+            ->postJson('/api/login/tenant-options', [
+                'username' => 'member@example.test',
+                'password' => 'correct-password',
+                'role' => 'user',
+            ])
+            ->assertOk()
+            ->assertJsonCount(2, 'tenants')
+            ->assertJsonFragment(['name' => $tenants[0]->name, 'slug' => $tenants[0]->slug])
+            ->assertJsonFragment(['name' => $tenants[1]->name, 'slug' => $tenants[1]->slug])
+            ->assertJsonMissingPath('tenants.0.id');
+
+        $this->postJson('/api/login/tenant-options', [
+            'username' => 'member@example.test',
+            'password' => 'wrong-password',
+            'role' => 'user',
+        ])->assertUnauthorized();
+
+        $this->postJson('/api/login/tenant-options', [
+            'username' => 'admin@example.test',
+            'password' => 'correct-password',
+            'role' => 'admin',
+        ])
+            ->assertOk()
+            ->assertJsonCount(2, 'tenants')
+            ->assertJsonFragment(['name' => $tenants[0]->name, 'slug' => $tenants[0]->slug])
+            ->assertJsonFragment(['name' => $tenants[1]->name, 'slug' => $tenants[1]->slug]);
+
+        $this->withHeader('X-Tenant-Slug', $tenants[0]->slug)
+            ->postJson('/api/login', [
+                'username' => 'member@example.test',
+                'password' => 'correct-password',
+            ])
+            ->assertOk()
+            ->assertJsonPath('1.role', 'user');
+
+        $this->withHeader('X-Tenant-Slug', $tenants[1]->slug)
+            ->postJson('/api/admin_login', [
+                'username' => 'admin@example.test',
+                'password' => 'correct-password',
+            ])
+            ->assertOk()
+            ->assertJsonPath('role', 'admin');
+    }
+
     public function test_user_tokens_cannot_read_another_users_profile(): void
     {
         $owner = $this->createUser('user');
