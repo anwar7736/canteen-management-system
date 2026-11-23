@@ -1,6 +1,14 @@
 {
   "short_name": "Canteen",
   "name": "Canteen Management",
+  "id": "/canteen-member-app",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.json",
+      "id": "/canteen-member-app"
+    }
+  ],
   "icons": [
     {
       "src": "canteen-icon.svg",

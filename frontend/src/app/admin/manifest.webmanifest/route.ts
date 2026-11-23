@@ -8,6 +8,7 @@ export async function GET() {
     shortName: 'Canteen Admin',
     startUrl: '/admin/',
     scope: '/admin/',
+    manifestUrl: '/admin/manifest.webmanifest',
     description: 'Canteen administration panel.',
     themeColor: '#1e293b',
   });

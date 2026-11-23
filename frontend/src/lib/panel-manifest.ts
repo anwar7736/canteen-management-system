@@ -6,6 +6,7 @@ type PanelManifestOptions = {
   shortName: string;
   startUrl: string;
   scope: string;
+  manifestUrl: string;
   description: string;
   themeColor: string;
 };
@@ -16,6 +17,7 @@ export function createPanelManifest({
   shortName,
   startUrl,
   scope,
+  manifestUrl,
   description,
   themeColor,
 }: PanelManifestOptions): MetadataRoute.Manifest {
@@ -27,6 +29,7 @@ export function createPanelManifest({
     start_url: startUrl,
     scope,
     display: 'standalone',
+    related_applications: [{ platform: 'webapp', url: manifestUrl, id }],
     background_color: '#f4f7fb',
     theme_color: themeColor,
     categories: ['business', 'productivity'],

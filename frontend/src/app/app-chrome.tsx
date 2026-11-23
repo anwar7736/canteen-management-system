@@ -11,14 +11,43 @@ type InstallPromptEvent = Event & {
 
 type PanelApp = {
   id: string;
+  manifestId: string;
   installLabel: string;
   installedLabel: string;
 };
+
+type InstalledRelatedApp = {
+  id?: string;
+  platform: string;
+};
+
+type NavigatorWithInstalledRelatedApps = Navigator & {
+  getInstalledRelatedApps?: () => Promise<InstalledRelatedApp[]>;
+};
+
+function isInstalledDisplayMode(displayMode: MediaQueryList) {
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean };
+  return displayMode.matches || navigatorWithStandalone.standalone === true;
+}
+
+async function hasInstalledRelatedApp(manifestId: string) {
+  const navigatorWithInstalledApps = navigator as NavigatorWithInstalledRelatedApps;
+  if (typeof navigatorWithInstalledApps.getInstalledRelatedApps !== 'function') return false;
+
+  try {
+    const installedApps = await navigatorWithInstalledApps.getInstalledRelatedApps();
+    return installedApps.some((app) => app.platform === 'webapp' && app.id === manifestId);
+  } catch (error) {
+    console.error('Unable to detect installed canteen app:', error);
+    return false;
+  }
+}
 
 function getPanelApp(pathname: string): PanelApp | null {
   if (pathname === '/platform' || pathname.startsWith('/platform/')) {
     return {
       id: 'platform-admin',
+      manifestId: '/platform/platform-admin-app',
       installLabel: 'Install platform admin app',
       installedLabel: 'Platform admin app is installed.',
     };
@@ -27,6 +56,7 @@ function getPanelApp(pathname: string): PanelApp | null {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return {
       id: 'canteen-admin',
+      manifestId: '/admin/admin-app',
       installLabel: 'Install canteen admin app',
       installedLabel: 'Canteen admin app is installed.',
     };
@@ -37,6 +67,7 @@ function getPanelApp(pathname: string): PanelApp | null {
     return pathname === '/' || pathname === '/login'
       ? {
           id: 'canteen-member',
+          manifestId: '/canteen-member-app',
           installLabel: 'Install member app',
           installedLabel: 'Member app is installed.',
         }
@@ -50,6 +81,7 @@ function getPanelApp(pathname: string): PanelApp | null {
 
   return {
     id: 'canteen-member',
+    manifestId: '/canteen-member-app',
     installLabel: 'Install member app',
     installedLabel: 'Member app is installed.',
   };
@@ -64,6 +96,7 @@ export default function AppChrome() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const panelApp = getPanelApp(pathname || '/');
   const panelId = panelApp?.id ?? null;
+  const manifestId = panelApp?.manifestId ?? null;
   const installLabel = panelApp?.installLabel ?? '';
   const installedLabel = panelApp?.installedLabel ?? '';
 
@@ -91,17 +124,40 @@ export default function AppChrome() {
 
   useEffect(() => {
     setInstallPrompt(null);
-    if (!panelId) {
+    if (!panelId || !manifestId) {
       setInstalled(null);
       setInstalledPanelId(null);
       return;
     }
 
     const storageKey = `canteen-pwa-installed:${panelId}`;
-    setInstalled(window.localStorage.getItem(storageKey) === 'true');
     setInstalledPanelId(panelId);
+    const displayMode = window.matchMedia('(display-mode: standalone)');
+    let active = true;
+    const updateInstalledState = async () => {
+      const runningAsInstalledApp = isInstalledDisplayMode(displayMode);
+      if (runningAsInstalledApp) {
+        window.localStorage.setItem(storageKey, 'true');
+      }
+      const alreadyMarkedInstalled = runningAsInstalledApp ||
+        window.localStorage.getItem(storageKey) === 'true';
+      setInstalled(alreadyMarkedInstalled);
+      if (alreadyMarkedInstalled) return;
+
+      const installedRelatedApp = await hasInstalledRelatedApp(manifestId);
+      if (!active) return;
+      if (installedRelatedApp) window.localStorage.setItem(storageKey, 'true');
+      setInstalled(installedRelatedApp);
+    };
+    void updateInstalledState();
 
     const handleInstallPrompt = (event: Event) => {
+      if (isInstalledDisplayMode(displayMode)) {
+        setInstalled(true);
+        setInstallPrompt(null);
+        return;
+      }
+
       event.preventDefault();
       window.localStorage.removeItem(storageKey);
       setInstalled(false);
@@ -113,14 +169,21 @@ export default function AppChrome() {
       setInstallPrompt(null);
       toast.success(installedLabel);
     };
+    const handleDisplayModeChange = () => {
+      updateInstalledState();
+      if (isInstalledDisplayMode(displayMode)) setInstallPrompt(null);
+    };
 
     window.addEventListener('beforeinstallprompt', handleInstallPrompt);
     window.addEventListener('appinstalled', handleInstalled);
+    displayMode.addEventListener('change', handleDisplayModeChange);
     return () => {
+      active = false;
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
       window.removeEventListener('appinstalled', handleInstalled);
+      displayMode.removeEventListener('change', handleDisplayModeChange);
     };
-  }, [installedLabel, panelId]);
+  }, [installedLabel, manifestId, panelId]);
 
   const toggleTheme = () => {
     const enabled = !dark;

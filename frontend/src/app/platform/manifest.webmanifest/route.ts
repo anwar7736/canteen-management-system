@@ -8,6 +8,7 @@ export async function GET() {
     shortName: 'Platform Admin',
     startUrl: '/platform/',
     scope: '/platform/',
+    manifestUrl: '/platform/manifest.webmanifest',
     description: 'CanteenOS platform administration panel.',
     themeColor: '#0f172a',
   });
