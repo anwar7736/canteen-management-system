@@ -119,6 +119,7 @@ export default function LoginForm({ role }: { role: LoginRole }) {
       localStorage.setItem('name', user.name || username.trim());
       if (user.photo) localStorage.setItem('photo', user.photo);
       if (user.token_no) localStorage.setItem('token_no', user.token_no);
+      else localStorage.removeItem('token_no');
       if (user.address) localStorage.setItem('address', user.address);
       if (rememberUsername) {
         localStorage.setItem('remembered_username', username.trim());

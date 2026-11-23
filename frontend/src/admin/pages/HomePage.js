@@ -3,6 +3,11 @@ import SideBar from '../components/SideBar';
 import Axios from "axios";
 import {Navigate} from 'react-router-dom';
 import API from './../api/api';
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {
+    faBowlFood, faCalendarCheck, faCartShopping, faCoins,
+    faMoneyBillWave, faPeopleGroup, faReceipt, faUtensils,
+} from '@fortawesome/free-solid-svg-icons';
 
 class HomePage extends Component {
 	constructor() {
@@ -63,74 +68,38 @@ class HomePage extends Component {
                         "July", "August", "September", 
                         "October", "November", "December"];
     	const {total_customer, total_meal, total_cancel_meal, total_bazar_cost, total_earnings, total_user_due, today_lunch_order, today_dinner_order} = this.state;
+        const metrics = [
+            {label: 'Total customers', value: total_customer, icon: faPeopleGroup},
+            {label: 'Meals served', value: total_meal, icon: faUtensils},
+            {label: 'Cancelled meals', value: total_cancel_meal, icon: faBowlFood},
+            {label: 'Market costs', value: `${total_bazar_cost} TK`, icon: faCoins},
+            {label: 'Payments received', value: `${total_earnings} TK`, icon: faMoneyBillWave},
+            {label: 'Outstanding balance', value: `${total_user_due} TK`, icon: faReceipt},
+            {label: 'Lunch orders today', value: today_lunch_order, icon: faCalendarCheck},
+            {label: 'Dinner orders today', value: today_dinner_order, icon: faCartShopping},
+        ];
         return (
             <Fragment>
             	<SideBar title="Home">
-                		 <div className="container-fluid animated zoomIn">
-                                        <h4 className="text-center bg-danger text-light p-2 my-2">Admin Dashboard</h4>
-             <h3 className="text-center bg-light text-success p-2 my-2">Month of <span>{months[new Date().getMonth()]}</span> <span className="text-danger">{new Date().getFullYear()}</span></h3>
-             <hr/>
-                                    
-                                        <div className="card text-center m-1">
+                    <div className="container-fluid animated zoomIn">
+                        <h4>Dashboard overview</h4>
+                        <h3><span>{months[new Date().getMonth()]}</span> <span>{new Date().getFullYear()}</span> performance</h3>
+                        <div className="admin-dashboard-grid">
+                            {metrics.map((metric) => (
+                                <div className="col-md-3" key={metric.label}>
+                                    <div className="card">
                                         <div className="card-body">
-                                            <h5 className="title-text">{total_customer}</h5>
-                                            <h5 className="des-text text-danger"><b>Total Customer</b></h5>
+                                            <span className="dashboard-metric-icon" aria-hidden="true">
+                                                <FontAwesomeIcon icon={metric.icon} />
+                                            </span>
+                                            <h5 className="title-text">{metric.value}</h5>
+                                            <p className="des-text"><b>{metric.label}</b></p>
                                         </div>
                                     </div>
-                               
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{total_meal}</h5>
-                                            <h5 className="des-text text-danger"><b>Total Meal</b></h5>
-                                        </div>
-                                    </div>
-                            
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{total_cancel_meal}</h5>
-                                            <h5 className="des-text text-danger"><b>Total Cancel Meal</b></h5>
-                                        </div>
-                                    </div>
-                              
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{total_bazar_cost}TK</h5>
-                                            <h5 className="des-text text-danger"><b>Total Bazar Cost</b></h5>
-                                        </div>
-                                    </div>
-                             
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{total_earnings}TK</h5>
-                                            <h5 className="des-text text-danger"><b>Total Earnings</b></h5>
-                                        </div>
-                                    </div>
-                              
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{total_user_due}TK</h5>
-                                            <h5 className="des-text text-danger"><b>Total Previous User Due</b></h5>
-                                        </div>
-                                    </div>
-                              
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{today_lunch_order}</h5>
-                                            <h5 className="des-text text-danger"><b>Today Lunch Order</b></h5>
-                                        </div>
-                                    </div>
-                               
-                                    <div className="card text-center m-1">
-                                        <div className="card-body">
-                                            <h5 className="title-text">{today_dinner_order}</h5>
-                                            <h5 className="des-text text-danger"><b>Today Dinner Order</b></h5>
-                                        </div>
-                                    </div>
-                                    
-                                
-                                
-                            
+                                </div>
+                            ))}
                         </div>
+                    </div>
                 </SideBar>
                 {this.RedirectToLogin()}
             </Fragment>

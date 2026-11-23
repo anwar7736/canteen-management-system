@@ -107,6 +107,7 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
   });
   const [auditsPage, setAuditsPage] = useState(1);
   const [usersPage, setUsersPage] = useState(1);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [pageError, setPageError] = useState('');
@@ -177,7 +178,7 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
     return () => {
       active = false;
     };
-  }, [tenantId, usersPage]);
+  }, [tenantId, usersPage, usersRefreshKey]);
 
   useEffect(() => {
     let active = true;
@@ -310,7 +311,11 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
     setUserPending(true);
     setPageError('');
     try {
-      const payload = userForm;
+      const payload: Partial<UserForm> = { ...userForm };
+      if (editingUser && !userForm.password) {
+        delete payload.password;
+        delete payload.password_confirmation;
+      }
       const response = await fetch(
         editingUser
           ? `/api/backend/platform/tenants/${tenantId}/users/${editingUser.id}`
@@ -333,6 +338,7 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
         }));
       } else {
         setUsersPage(1);
+        setUsersRefreshKey((current) => current + 1);
       }
       setTenant((current) => current ? {
         ...current,
@@ -529,11 +535,11 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
   }
 
   if (loading) {
-    return <section className="min-h-screen bg-slate-950 p-6 text-slate-400">Loading canteen details…</section>;
+    return <section className="platform-page"><div className="platform-panel">Loading canteen details…</div></section>;
   }
   if (!tenant) {
     return (
-      <section className="min-h-screen bg-slate-950 p-6 text-slate-100">
+      <section className="platform-page">
         <p className="rounded-xl bg-red-950 px-4 py-3 text-red-200" role="alert">{pageError || 'Canteen not found.'}</p>
         <Link href="/platform" className="mt-4 inline-block text-emerald-300">Back to platform</Link>
       </section>
@@ -541,24 +547,27 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
   }
 
   return (
-    <section className="min-h-screen bg-slate-950 p-6 text-slate-100">
-      <div className="mx-auto max-w-6xl">
-        <Link href="/platform#canteens" className="text-sm text-emerald-300 hover:text-emerald-200">← Back to canteens</Link>
+    <section className="platform-page">
+      <div>
+        <Link href="/platform#canteens" className="text-sm font-bold text-emerald-700 hover:text-emerald-800">← Back to canteens</Link>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm text-emerald-400">Tenant workspace</p>
-            <h1 className="mt-1 text-3xl font-bold">{tenant.name}</h1>
+            <p className="mt-3 text-xs font-bold uppercase tracking-[.14em] text-emerald-700">Tenant workspace</p>
+            <h1 className="mt-1 text-3xl font-extrabold">{tenant.name}</h1>
             <p className="mt-1 text-sm text-slate-400">/t/{tenant.slug} · {tenant.users_count} users</p>
           </div>
-          <button type="button" className="rounded-lg border border-red-800 px-4 py-2 text-red-200 disabled:opacity-50" onClick={deleteTenant} disabled={tenantPending}>
+          <button type="button" className="rounded-xl border border-red-800 bg-rose-50 px-4 py-2 font-bold text-rose-700 disabled:opacity-50" onClick={deleteTenant} disabled={tenantPending}>
             Permanently delete canteen
           </button>
         </div>
 
         {pageError && <p className="mt-5 rounded-xl bg-red-950 px-4 py-3 text-red-200" role="alert">{pageError}</p>}
 
-        <form noValidate onSubmit={saveTenant} className="mt-6 grid gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2">
-          <h2 className="text-xl font-semibold md:col-span-2">Canteen settings</h2>
+        <form noValidate onSubmit={saveTenant} className="platform-panel mt-6 grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <p className="mb-1 text-xs font-bold uppercase tracking-[.14em] text-emerald-700">Workspace setup</p>
+            <h2 className="m-0 text-xl font-extrabold">Canteen settings</h2>
+          </div>
           <div className="auth-field">
             <label htmlFor="tenant-name">Canteen name</label>
             <input id="tenant-name" className={`form-control${tenantErrors.name ? ' is-invalid' : ''}`}
@@ -615,7 +624,7 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
           </div>
         </form>
 
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <div className="platform-panel mt-8">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold">Tenant users</h2>
@@ -627,44 +636,44 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left">
-              <thead className="text-xs uppercase text-slate-400">
+            <table className="mobile-card-table text-left">
+              <thead>
                 <tr>
-                  <th className="px-3 py-2">Name</th>
-                  <th className="px-3 py-2">Username / token</th>
-                  <th className="px-3 py-2">Contact</th>
-                  <th className="px-3 py-2">Role</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Actions</th>
+                  <th>Name</th>
+                  <th>Username / token</th>
+                  <th>Contact</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {usersLoading ? (
-                  <tr><td className="px-3 py-5 text-slate-400" colSpan={6}>Loading tenant users…</td></tr>
+                  <tr><td className="py-5 text-slate-400" colSpan={6}>Loading tenant users…</td></tr>
                 ) : users.data.length === 0 ? (
-                  <tr><td className="px-3 py-5 text-slate-400" colSpan={6}>No tenant users found.</td></tr>
+                  <tr><td className="py-5 text-slate-400" colSpan={6}>No tenant users found.</td></tr>
                 ) : users.data.map((user) => (
                   <tr key={user.id} className="border-t border-slate-800 align-top">
-                    <td className="px-3 py-3">
+                    <td data-label="Name">
                       <div className="font-medium">{user.name}</div>
                       <div className="text-xs text-slate-400">{user.email}</div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td data-label="Username / token">
                       <div>{user.username}</div>
                       <div className="text-xs text-slate-400">Token {user.token_no}</div>
                     </td>
-                    <td className="px-3 py-3">{user.phone}</td>
-                    <td className="px-3 py-3 capitalize">{user.role}</td>
-                    <td className="px-3 py-3 capitalize">{user.status}</td>
-                    <td className="px-3 py-3">
+                    <td data-label="Contact">{user.phone}</td>
+                    <td data-label="Role" className="capitalize">{user.role}</td>
+                    <td data-label="Status"><span className={`platform-chip ${user.status === 'active' ? '' : 'is-warning'}`}>{user.status}</span></td>
+                    <td data-label="Actions">
                       <div className="flex max-w-md flex-wrap gap-2">
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5" type="button" onClick={() => openEditUser(user)}>Edit</button>
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 disabled:opacity-50" type="button" onClick={() => changeUserStatus(user)} disabled={actionUserId === user.id}>
+                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold" type="button" onClick={() => openEditUser(user)}>Edit</button>
+                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => changeUserStatus(user)} disabled={actionUserId === user.id}>
                           {user.status === 'active' ? 'Suspend' : 'Reactivate'}
                         </button>
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 disabled:opacity-50" type="button" onClick={() => sendPasswordReset(user)} disabled={actionUserId === user.id}>Reset password</button>
-                        <button className="rounded-lg border border-amber-800 px-2.5 py-1.5 text-amber-200 disabled:opacity-50" type="button" onClick={() => impersonate(user)} disabled={actionUserId === user.id || user.status !== 'active' || tenant.status !== 'active'}>Impersonate</button>
-                        <button className="rounded-lg border border-red-800 px-2.5 py-1.5 text-red-200 disabled:opacity-50" type="button" onClick={() => deleteUser(user)} disabled={actionUserId === user.id}>Delete</button>
+                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => sendPasswordReset(user)} disabled={actionUserId === user.id}>Reset password</button>
+                        <button className="rounded-lg border border-amber-800 px-2.5 py-1.5 font-bold text-amber-700 disabled:opacity-50" type="button" onClick={() => impersonate(user)} disabled={actionUserId === user.id || user.status !== 'active' || tenant.status !== 'active'}>Impersonate</button>
+                        <button className="rounded-lg border border-red-800 px-2.5 py-1.5 font-bold text-red-700 disabled:opacity-50" type="button" onClick={() => deleteUser(user)} disabled={actionUserId === user.id}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -682,36 +691,36 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <div className="platform-panel mt-8">
             <div className="mb-4">
               <h2 className="text-xl font-semibold">Impersonation audit history</h2>
               <p className="mt-1 text-sm text-slate-400">{audits.total} recorded support sessions.</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-left">
-                <thead className="text-xs uppercase text-slate-400">
+              <table className="mobile-card-table text-left">
+                <thead>
                   <tr>
-                    <th className="px-3 py-2">Started</th>
-                    <th className="px-3 py-2">Platform admin</th>
-                    <th className="px-3 py-2">Impersonated user</th>
-                    <th className="px-3 py-2">Reason</th>
-                    <th className="px-3 py-2">Expires</th>
-                    <th className="px-3 py-2">Status</th>
+                    <th>Started</th>
+                    <th>Platform admin</th>
+                    <th>Impersonated user</th>
+                    <th>Reason</th>
+                    <th>Expires</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {audits.data.length === 0 ? (
-                    <tr><td className="px-3 py-5 text-slate-400" colSpan={6}>No impersonation sessions recorded.</td></tr>
+                    <tr><td className="py-5 text-slate-400" colSpan={6}>No impersonation sessions recorded.</td></tr>
                   ) : audits.data.map((audit) => {
                     const expired = new Date(audit.expires_at).getTime() <= Date.now();
                     return (
                       <tr key={audit.id} className="border-t border-slate-800 align-top">
-                        <td className="px-3 py-3">{new Date(audit.started_at).toLocaleString()}</td>
-                        <td className="px-3 py-3">{audit.platform_admin_username}</td>
-                        <td className="px-3 py-3">{audit.target_username}</td>
-                        <td className="max-w-sm whitespace-normal px-3 py-3">{audit.reason}</td>
-                        <td className="px-3 py-3">{new Date(audit.expires_at).toLocaleString()}</td>
-                        <td className="px-3 py-3">{audit.ended_at ? 'Ended' : expired ? 'Expired' : 'Active'}</td>
+                        <td data-label="Started">{new Date(audit.started_at).toLocaleString()}</td>
+                        <td data-label="Platform admin">{audit.platform_admin_username}</td>
+                        <td data-label="Impersonated user">{audit.target_username}</td>
+                        <td data-label="Reason" className="max-w-sm whitespace-normal">{audit.reason}</td>
+                        <td data-label="Expires">{new Date(audit.expires_at).toLocaleString()}</td>
+                        <td data-label="Status"><span className={`platform-chip ${audit.ended_at || expired ? 'is-warning' : ''}`}>{audit.ended_at ? 'Ended' : expired ? 'Expired' : 'Active'}</span></td>
                       </tr>
                     );
                   })}

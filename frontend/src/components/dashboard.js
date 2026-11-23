@@ -1,6 +1,11 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
 import DataTable from "react-data-table-component";
+import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import {
+    faBowlFood, faCalendarDays, faCoins, faEnvelope,
+    faMoon, faMoneyBillWave, faUtensils, faWallet,
+} from '@fortawesome/free-solid-svg-icons';
 import Axios from 'axios';
 import API from '../api/API';
 import cogoToast from '../utils/cogoToast';
@@ -222,81 +227,38 @@ class Dashboard extends React.Component{
                         "April", "May", "June", 
                         "July", "August", "September", 
                         "October", "November", "December"];
+        const metrics = [
+            {label: 'Lunches', value: this.state.total_lunch, icon: faBowlFood},
+            {label: 'Dinners', value: this.state.total_dinner, icon: faMoon},
+            {label: 'Meals this month', value: this.state.total_meal, icon: faUtensils},
+            {label: 'Meal cost', value: `${this.state.total_cost} TK`, icon: faCoins},
+            {label: 'Payments made', value: `${this.state.total_payment} TK`, icon: faMoneyBillWave},
+            {label: 'Balance due', value: `${this.state.total_due} TK`, icon: faWallet},
+            {label: 'Unread messages', value: this.state.unread_notification, icon: faEnvelope},
+            {label: 'Messages sent', value: this.state.total_sending_message, icon: faCalendarDays},
+        ];
  	return(
  		<Fragment>
         <div className="container animated zoomIn" style={{marginBottom : '100px'}}>   
-            <h4 className="text-center bg-danger text-light p-2 my-2">Dashboard Summary</h4>
-             <h3 className="text-center bg-light text-success p-2 my-2">Month of <span>{months[new Date().getMonth()]}</span> <span className="text-danger">{new Date().getFullYear()}</span></h3>
-             <hr/>
+            <h4>My canteen overview</h4>
+             <h3>{months[new Date().getMonth()]} {new Date().getFullYear()} summary</h3>
             <div className="row m-3">
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Lunch</h3>
-                            <h1 className="text-danger card-item">{this.state.total_lunch}</h1>
+                {metrics.map((metric) => (
+                    <div className="col-md-3 mb-3" key={metric.label}>
+                        <div className="card">
+                            <div className="card-body">
+                                <span className="dashboard-metric-icon" aria-hidden="true">
+                                    <FontAwesomeIcon icon={metric.icon} />
+                                </span>
+                                <h1 className="card-item">{metric.value}</h1>
+                                <p className="des-text"><b>{metric.label}</b></p>
+                            </div>
                         </div>
                     </div>
-                </div> 
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Dinner</h3>
-                            <h1 className="text-danger card-item">{this.state.total_dinner}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Meal</h3>
-                            <h1 className="text-danger card-item">{this.state.total_meal}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Cost</h3>
-                            <h1 className="text-danger card-item">{this.state.total_cost}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Payment</h3>
-                            <h1 className="text-danger card-item">{this.state.total_payment}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Total Due</h3>
-                            <h1 className="text-danger card-item">{this.state.total_due}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Unread Msg</h3>
-                            <h1 className="text-danger card-item">{this.state.unread_notification}</h1>
-                        </div>
-                    </div>
-                </div>
-                <div className="col-md-3 mb-3">
-                    <div className="card">
-                        <div className="card-body text-center">
-                            <h3 className="text-success">Send Message</h3>
-                            <h1 className="text-danger card-item">{this.state.total_sending_message}</h1>
-                        </div>
-                    </div>
-                </div>
+                ))}
             </div>
-            <hr/><h5 className="text-center text-danger">Last 7 Days Meal Summary</h5>
-            <div className="">
-                <div className="">
+            <section className="dashboard-table-section">
+                <h5>Last 7 days · meal summary</h5>
                     <DataTable
                         noHeader={true}
                         paginationPerPage={5}
@@ -304,12 +266,9 @@ class Dashboard extends React.Component{
                         columns={columns}
                         data={this.state.LastSevenDaysMealReport}
                     />
-                </div>
-            </div>
-            <hr/>
-            <div className="">
-                <div className="">
-                    <h6 className="text-center text-danger">Last Five Payment Details</h6>
+            </section>
+            <section className="dashboard-table-section">
+                    <h6>Recent payments</h6>
                     <DataTable
                         noHeader={true}
                         paginationPerPage={5}
@@ -317,11 +276,9 @@ class Dashboard extends React.Component{
                         columns={payments}
                         data={this.state.LastFivePaymentDetails}
                     />
-                </div>
-			</div>
-			<div className="">
-                <div className="">
-                <h6 className="text-center text-danger">Last Five Months Statement</h6>
+            </section>
+            <section className="dashboard-table-section">
+                <h6>Monthly statements</h6>
                     <DataTable
                         noHeader={true}
                         paginationPerPage={5}
@@ -329,8 +286,7 @@ class Dashboard extends React.Component{
                         columns={statements}
                         data={this.state.LastFiveMonthsStatements}
                     />
-                </div>
-            </div>
+            </section>
         </div>  
  		</Fragment>
  		)

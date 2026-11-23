@@ -136,16 +136,19 @@ export default function PlatformTenantCreate() {
   }
 
   return (
-    <section className="min-h-screen bg-slate-950 p-6 text-slate-100">
-      <div className="mx-auto max-w-4xl">
-        <Link href="/platform" className="text-sm text-emerald-300 hover:text-emerald-200">← Back to platform</Link>
-        <h1 className="mt-4 text-3xl font-bold">Create a canteen workspace</h1>
+    <section className="platform-page">
+      <div>
+        <Link href="/platform" className="text-sm font-bold text-emerald-700 hover:text-emerald-800">← Back to platform</Link>
+        <div className="platform-hero mt-4">
+        <p className="mb-2 text-sm font-bold uppercase tracking-[.15em] text-emerald-100">New workspace</p>
+        <h1 className="m-0 text-3xl font-extrabold">Create a canteen</h1>
         <p className="mt-2 text-sm text-slate-400">
-          Create a tenant and its initial administrator account. The workspace URL is generated from the canteen name.
+          Set up a workspace and its first administrator. The workspace URL will be generated from the canteen name.
         </p>
+        </div>
         {pageError && <p className="mt-5 rounded-xl bg-red-950 px-4 py-3 text-red-200" role="alert">{pageError}</p>}
 
-        <form noValidate onSubmit={submit} className="mt-6 grid gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-5 md:grid-cols-2">
+        <form noValidate onSubmit={submit} className="platform-panel mt-5 grid gap-4 md:grid-cols-2">
           <div className="auth-field">
             <label htmlFor="tenant-name">Canteen name</label>
             <input id="tenant-name" className={`form-control${errors.tenant_name ? ' is-invalid' : ''}`}
