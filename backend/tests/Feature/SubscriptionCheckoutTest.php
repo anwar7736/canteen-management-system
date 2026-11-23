@@ -21,6 +21,10 @@ class SubscriptionCheckoutTest extends TestCase
 
     public function test_checkout_sends_complete_address_data_and_subscription_callbacks(): void
     {
+        config([
+            'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
+            'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
+        ]);
         $tenant = Tenant::create([
             'name' => 'Sandbox Canteen',
             'slug' => 'sandbox-canteen',
