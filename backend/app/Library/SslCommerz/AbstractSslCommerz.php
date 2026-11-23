@@ -45,6 +45,10 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
      */
     public function callToApi($data, $header = [], $setLocalhost = false)
     {
+        if (!$this->isTrustedSslCommerzUrl($this->getApiUrl())) {
+            return 'FAILED TO CONNECT WITH SSLCOMMERZ API';
+        }
+
         $curl = curl_init();
         if ($curl === false) {
             return 'FAILED TO CONNECT WITH SSLCOMMERZ API';
@@ -72,6 +76,23 @@ abstract class AbstractSslCommerz implements SslCommerzInterface
         }
 
         return 'FAILED TO CONNECT WITH SSLCOMMERZ API';
+    }
+
+    protected function isTrustedSslCommerzUrl(?string $url): bool
+    {
+        if (!is_string($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+
+        return is_array($parts)
+            && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+            && in_array($host, ['sandbox.sslcommerz.com', 'securepay.sslcommerz.com'], true)
+            && in_array($parts['port'] ?? null, [null, 443], true)
+            && !isset($parts['user'])
+            && !isset($parts['pass']);
     }
 
     /**

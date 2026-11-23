@@ -18,6 +18,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PlatformAdminController;
 use App\Http\Controllers\PublicTenantController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\SslCommerzPaymentController;
 use App\Http\Controllers\TenantRegistrationController;
 use App\Http\Controllers\TenantSignupVerificationController;
 use Illuminate\Http\Request;
@@ -79,6 +80,8 @@ Route::get('/GetMealRate', [MealRateController::class, 'GetMealRate']);
 Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:user', 'owned.api'])->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
 
+    Route::post('/member/payment/checkout', [SslCommerzPaymentController::class, 'checkoutMember'])
+        ->middleware('throttle:10,1');
     Route::get('/PaymentDetailsByUser/{token_no}', [PaymentDetailsController::class, 'PaymentDetailsByUser']);
     Route::post('/PaymentDetailsFilterByDate', [PaymentDetailsController::class, 'PaymentDetailsFilterByDate']);
 
@@ -123,7 +126,7 @@ Route::middleware(['auth:sanctum', 'tenant.member', 'owned.api'])->group(functio
 Route::middleware(['auth:sanctum', 'tenant.member', 'role:admin'])->prefix('tenant')->group(function () {
     Route::get('/plans', [SubscriptionController::class, 'plans']);
     Route::get('/subscription', [SubscriptionController::class, 'current']);
-    Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout']);
+    Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout'])->middleware('throttle:10,1');
 });
 
 Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:admin'])->group(function () {

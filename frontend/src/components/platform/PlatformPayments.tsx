@@ -39,6 +39,14 @@ function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleString() : '—';
 }
 
+function paymentStatusCategory(status: string): 'paid' | 'pending' | 'failed' | 'other' {
+  const normalized = status.trim().toLowerCase();
+  if (['paid', 'complete', 'completed', 'processing'].includes(normalized)) return 'paid';
+  if (normalized === 'pending') return 'pending';
+  if (['failed', 'canceled', 'cancelled'].includes(normalized)) return 'failed';
+  return 'other';
+}
+
 export default function PlatformPayments() {
   const [paymentPage, setPaymentPage] = useState<PaymentPage>({
     data: [],
@@ -55,9 +63,9 @@ export default function PlatformPayments() {
   const visiblePayments = paymentPage.data.filter((payment) => {
     const searchText = `${payment.transaction_id} ${payment.tenant?.name || ''} ${payment.tenant?.slug || ''} ${payment.plan?.name || ''}`.toLowerCase();
     return searchText.includes(query.trim().toLowerCase())
-      && (statusFilter === 'all' || payment.status.toLowerCase() === statusFilter);
+      && (statusFilter === 'all' || paymentStatusCategory(payment.status) === statusFilter);
   });
-  const paidOnPage = paymentPage.data.filter((payment) => payment.status.toLowerCase() === 'paid');
+  const paidOnPage = paymentPage.data.filter((payment) => paymentStatusCategory(payment.status) === 'paid');
   const paidAmount = paidOnPage.reduce((total, payment) => total + Number(payment.amount), 0);
 
   useEffect(() => {
@@ -170,7 +178,11 @@ export default function PlatformPayments() {
                   <td data-label="Plan">{payment.plan?.name || 'Deleted plan'}</td>
                   <td data-label="Transaction" className="font-mono text-xs">{payment.transaction_id}</td>
                   <td data-label="Amount">{payment.currency} {Number(payment.amount).toLocaleString()}</td>
-                  <td data-label="Status"><span className={`platform-chip ${payment.status.toLowerCase() === 'paid' ? '' : payment.status.toLowerCase() === 'pending' ? 'is-warning' : 'is-danger'}`}>{payment.status}</span></td>
+                  <td data-label="Status">
+                    <span className={`platform-chip ${paymentStatusCategory(payment.status) === 'paid' ? '' : paymentStatusCategory(payment.status) === 'pending' ? 'is-warning' : 'is-danger'}`}>
+                      {paymentStatusCategory(payment.status) === 'paid' ? 'Paid' : payment.status}
+                    </span>
+                  </td>
                   <td data-label="Gateway" className="capitalize">{payment.gateway}</td>
                   <td data-label="Paid at">{formatDate(payment.paid_at)}</td>
                 </tr>

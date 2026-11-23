@@ -61,12 +61,19 @@ class SslCommerzNotification extends AbstractSslCommerz
             return false;
         }
 
-        $requestedUrl = $this->config['apiDomain']
+        $apiDomain = rtrim((string) ($this->config['apiDomain'] ?? ''), '/');
+        $requestedUrl = $apiDomain
             .$this->config['apiUrl']['order_validate']
             .'?val_id='.urlencode($post_data['val_id'])
             .'&store_id='.urlencode($this->getStoreId())
             .'&store_passwd='.urlencode($this->getStorePassword())
             .'&v=1&format=json';
+        if (!$this->isTrustedSslCommerzUrl($requestedUrl)) {
+            $this->error = 'SSLCommerz validation must use its trusted HTTPS endpoint';
+
+            return false;
+        }
+
         $handle = curl_init();
         if ($handle === false) {
             $this->error = 'Unable to connect to SSLCommerz';

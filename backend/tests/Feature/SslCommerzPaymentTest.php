@@ -3,82 +3,129 @@
 namespace Tests\Feature;
 
 use App\Library\SslCommerz\SslCommerzNotification;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Support\PaymentUrls;
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class SslCommerzPaymentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_payment_initiation_requires_credentials_and_does_not_save_an_unstarted_payment(): void
+    public function test_member_checkout_requires_credentials_and_does_not_save_a_payment(): void
     {
         config([
             'sslcommerz.apiCredentials.store_id' => null,
             'sslcommerz.apiCredentials.store_password' => null,
         ]);
         $user = $this->createUser();
+        $this->authenticate($user);
 
-        $this->post('/pay', $this->paymentPayload($user))
+        $this->postJson('/api/member/payment/checkout', $this->checkoutPayload())
             ->assertStatus(503);
 
         $this->assertDatabaseCount('payments', 0);
     }
 
-    public function test_payment_initiation_redirects_to_gateway_and_saves_pending_payment(): void
+    public function test_member_checkout_uses_authenticated_profile_and_saves_pending_payment(): void
     {
         config([
             'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
             'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
         ]);
         $user = $this->createUser();
+        $this->createStatement($user);
+        $this->authenticate($user);
+        $gatewayUrl = 'https://sandbox.sslcommerz.com/gwprocess/v4/gw.php';
 
-        $this->mock(SslCommerzNotification::class, function ($mock) {
+        $this->mock(SslCommerzNotification::class, function ($mock) use ($user, $gatewayUrl) {
             $mock->shouldReceive('makePayment')
                 ->once()
-                ->withArgs(function (array $data, string $type, string $pattern) {
+                ->withArgs(function (array $data, string $type, string $pattern) use ($user) {
                     return $data['currency'] === 'BDT'
                         && $data['total_amount'] === '25.00'
+                        && $data['cus_name'] === $user->name
+                        && $data['cus_token'] === $user->token_no
+                        && $data['cus_email'] === $user->email
+                        && $data['cus_phone'] === $user->phone
+                        && $data['success_url'] === url('/success')
                         && $data['ipn_url'] === url('/ipn')
                         && $type === 'checkout'
-                        && $pattern === 'json';
+                        && $pattern === 'json'
+                        && DB::table('payments')->where('status', 'Pending')->exists();
                 })
                 ->andReturn(json_encode([
                     'status' => 'success',
-                    'data' => 'https://sandbox.sslcommerz.com/gwprocess/v4/gw.php',
+                    'data' => $gatewayUrl,
                 ]));
         });
 
-        $this->post('/pay', $this->paymentPayload($user))
-            ->assertRedirect('https://sandbox.sslcommerz.com/gwprocess/v4/gw.php');
+        $this->postJson('/api/member/payment/checkout', $this->checkoutPayload() + [
+            'customer_email' => 'attacker@example.test',
+            'customer_mobile' => '01000000000',
+        ])
+            ->assertOk()
+            ->assertJson(['gateway_url' => $gatewayUrl]);
 
-        $payment = DB::table('payments')->first();
-        $this->assertNotNull($payment);
-        $this->assertSame('Pending', $payment->status);
-        $this->assertEquals(25, $payment->amount);
+        $this->assertDatabaseHas('payments', [
+            'tenant_id' => $user->tenant_id,
+            'name' => $user->name,
+            'token_no' => $user->token_no,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'amount' => 25,
+            'status' => 'Pending',
+        ]);
     }
 
-    public function test_gateway_error_response_does_not_create_a_pending_payment(): void
+    public function test_gateway_failure_marks_the_payment_failed(): void
     {
         config([
             'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
             'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
         ]);
         $user = $this->createUser();
+        $this->createStatement($user);
+        $this->authenticate($user);
         $gateway = new SslCommerzNotification();
         $failure = $gateway->formatResponse('FAILED TO CONNECT WITH SSLCOMMERZ API', 'checkout', 'json');
-        $this->assertSame('fail', json_decode($failure, true)['status']);
 
         $this->mock(SslCommerzNotification::class, function ($mock) use ($failure) {
             $mock->shouldReceive('makePayment')->once()->andReturn($failure);
         });
 
-        $this->post('/pay', $this->paymentPayload($user))
+        $this->postJson('/api/member/payment/checkout', $this->checkoutPayload())
             ->assertStatus(502);
 
-        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseHas('payments', ['status' => 'Failed']);
+    }
+
+    public function test_member_checkout_rejects_an_untrusted_gateway_url(): void
+    {
+        config([
+            'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
+            'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
+        ]);
+        $user = $this->createUser();
+        $this->createStatement($user);
+        $this->authenticate($user);
+
+        $this->mock(SslCommerzNotification::class, function ($mock) {
+            $mock->shouldReceive('makePayment')->once()->andReturn(json_encode([
+                'status' => 'success',
+                'data' => 'https://gateway.attacker.example/checkout',
+            ]));
+        });
+
+        $this->postJson('/api/member/payment/checkout', $this->checkoutPayload())
+            ->assertStatus(502);
+
+        $this->assertDatabaseHas('payments', ['status' => 'Failed']);
     }
 
     public function test_incomplete_gateway_callback_is_rejected_without_network_validation(): void
@@ -97,12 +144,13 @@ class SslCommerzPaymentTest extends TestCase
         ], 'transaction-id', 25, 'BDT'));
     }
 
-    public function test_success_callback_validates_and_updates_statement_once(): void
+    public function test_success_callback_resolves_tenant_and_updates_statement_once(): void
     {
         $user = $this->createUser();
         $this->createStatement($user);
         $transactionId = 'SSL-SANDBOX-TRANSACTION-001';
         $this->createPendingPayment($user, $transactionId, 25);
+        $tenantSlug = Tenant::findOrFail($user->tenant_id)->slug;
 
         $this->mock(SslCommerzNotification::class, function ($mock) use ($transactionId) {
             $mock->shouldReceive('orderValidate')
@@ -113,10 +161,11 @@ class SslCommerzPaymentTest extends TestCase
                 ->andReturnTrue();
         });
 
+        app(TenantContext::class)->clear();
         $this->post('/success', ['tran_id' => $transactionId, 'amount' => 999])
-            ->assertRedirect('http://localhost:3001/payment_summary?payment=completed');
+            ->assertRedirect(PaymentUrls::frontend('/t/'.$tenantSlug.'/payment_summary', ['payment' => 'completed']));
         $this->post('/success', ['tran_id' => $transactionId])
-            ->assertRedirect('http://localhost:3001/payment_summary?payment=already_completed');
+            ->assertRedirect(PaymentUrls::frontend('/t/'.$tenantSlug.'/payment_summary', ['payment' => 'already_completed']));
 
         $this->assertDatabaseHas('payments', [
             'transaction_id' => $transactionId,
@@ -130,7 +179,7 @@ class SslCommerzPaymentTest extends TestCase
         ]);
     }
 
-    public function test_unknown_and_invalid_callbacks_do_not_crash_or_complete_a_payment(): void
+    public function test_unknown_and_invalid_callbacks_do_not_complete_a_payment(): void
     {
         $user = $this->createUser();
         $transactionId = 'SSL-SANDBOX-TRANSACTION-002';
@@ -141,7 +190,7 @@ class SslCommerzPaymentTest extends TestCase
         });
 
         $this->post('/success', ['tran_id' => 'UNKNOWN-TRANSACTION'])
-            ->assertRedirect('http://localhost:3001/payment_summary?payment=invalid');
+            ->assertRedirect(PaymentUrls::frontend('/login', ['payment' => 'invalid']));
         $this->post('/ipn', ['tran_id' => $transactionId])
             ->assertUnprocessable();
         $this->post('/ipn')
@@ -156,17 +205,23 @@ class SslCommerzPaymentTest extends TestCase
     public function test_fail_and_cancel_callbacks_only_change_pending_payments(): void
     {
         $user = $this->createUser();
-        $transactionId = 'SSL-SANDBOX-TRANSACTION-003';
-        $this->createPendingPayment($user, $transactionId, 25);
+        $failedTransactionId = 'SSL-SANDBOX-TRANSACTION-003';
+        $canceledTransactionId = 'SSL-SANDBOX-TRANSACTION-004';
+        $this->createPendingPayment($user, $failedTransactionId, 25);
+        $this->createPendingPayment($user, $canceledTransactionId, 25);
 
-        $this->post('/fail', ['tran_id' => $transactionId])
-            ->assertRedirect('http://localhost:3001/payment_summary?payment=failed');
-        $this->post('/cancel', ['tran_id' => $transactionId])
-            ->assertRedirect('http://localhost:3001/payment_summary?payment=canceled');
+        $this->post('/fail', ['tran_id' => $failedTransactionId])
+            ->assertRedirect(PaymentUrls::frontend('/t/'.Tenant::findOrFail($user->tenant_id)->slug.'/payment_summary', ['payment' => 'failed']));
+        $this->post('/cancel', ['tran_id' => $canceledTransactionId])
+            ->assertRedirect(PaymentUrls::frontend('/t/'.Tenant::findOrFail($user->tenant_id)->slug.'/payment_summary', ['payment' => 'canceled']));
 
         $this->assertDatabaseHas('payments', [
-            'transaction_id' => $transactionId,
+            'transaction_id' => $failedTransactionId,
             'status' => 'Failed',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'transaction_id' => $canceledTransactionId,
+            'status' => 'Canceled',
         ]);
     }
 
@@ -177,6 +232,7 @@ class SslCommerzPaymentTest extends TestCase
             'username' => 'sandbox-user',
             'email' => 'sandbox@example.test',
             'phone' => '01700000000',
+            'address' => 'Dhaka',
             'token_no' => 123456,
             'role' => 'user',
             'status' => 'active',
@@ -184,16 +240,18 @@ class SslCommerzPaymentTest extends TestCase
         ]);
     }
 
-    private function paymentPayload(User $user): array
+    private function authenticate(User $user): void
+    {
+        Sanctum::actingAs($user, ['user']);
+        $tenant = Tenant::findOrFail($user->tenant_id);
+        $this->withHeader('X-Tenant-Slug', $tenant->slug);
+    }
+
+    private function checkoutPayload(): array
     {
         return [
             'year' => 2026,
             'month' => 'November',
-            'customer_name' => $user->name,
-            'customer_token' => $user->token_no,
-            'customer_email' => $user->email,
-            'customer_mobile' => $user->phone,
-            'cutomer_addr' => 'Dhaka',
             'amount' => '25.00',
         ];
     }

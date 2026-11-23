@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Library\SslCommerz\SslCommerzNotification;
 use App\Models\MonthlyStatement;
-use App\Models\User;
 use App\Models\Tenant;
+use App\Support\PaymentUrls;
 use App\Tenancy\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,93 +25,105 @@ class SslCommerzPaymentController extends Controller
         return view('exampleEasycheckout');
     }
 
-    public function onlineSSLPayment()
+    public function onlineSSLPayment(): RedirectResponse
     {
-        $tokens = User::get('token_no');
-
-        return view('onlineSSLPayment', compact('tokens'));
+        return redirect()->to(PaymentUrls::frontend('/login'));
     }
 
-    public function index(Request $request, SslCommerzNotification $sslCommerz): RedirectResponse
+    public function index()
+    {
+        abort(410, 'Start payments from the signed-in member portal.');
+    }
+
+    public function checkoutMember(Request $request, SslCommerzNotification $sslCommerz): JsonResponse
     {
         $validated = $request->validate([
             'year' => ['required', 'integer', 'between:2000,2100'],
             'month' => ['required', 'string', 'in:'.implode(',', self::MONTHS)],
-            'customer_name' => ['required', 'string', 'max:50'],
-            'customer_token' => ['required', 'integer', 'exists:users,token_no'],
-            'customer_email' => ['required', 'email', 'max:50'],
-            'customer_mobile' => ['required', 'string', 'max:20'],
-            'cutomer_addr' => ['required', 'string', 'max:50'],
             'amount' => ['required', 'numeric', 'decimal:0,2', 'between:10,500000'],
         ]);
 
         if (!filled(config('sslcommerz.apiCredentials.store_id'))
             || !filled(config('sslcommerz.apiCredentials.store_password'))) {
-            abort(503, 'SSLCommerz sandbox credentials are not configured.');
+            abort(503, 'SSLCommerz credentials are not configured.');
+        }
+
+        $tenant = app(TenantContext::class)->tenant();
+        if (!$tenant) {
+            abort(400, 'A tenant context is required to start payment.');
+        }
+
+        $user = $request->user();
+        if (
+            !$user
+            || $user->role !== 'user'
+            || $user->status !== 'active'
+            || (int) $user->tenant_id !== (int) $tenant->getKey()
+        ) {
+            abort(403, 'An active member account is required to start payment.');
+        }
+
+        $statement = MonthlyStatement::query()
+            ->where('token_no', $user->token_no)
+            ->where('year', $validated['year'])
+            ->where('month', $validated['month'])
+            ->first();
+        if (!$statement) {
+            abort(422, 'The monthly statement for this payment was not found.');
         }
 
         $transactionId = $this->newTransactionId();
         $amount = number_format((float) $validated['amount'], 2, '.', '');
+        $address = Str::limit($user->address ?: $tenant->name, 50, '');
+        if (strlen($user->email) > 50 || strlen($user->phone) > 20) {
+            abort(422, 'Update your email address and phone number before making a payment.');
+        }
         $paymentData = [
             'total_amount' => $amount,
             'currency' => 'BDT',
             'tran_id' => $transactionId,
             'year' => $validated['year'],
             'month' => $validated['month'],
-            'cus_name' => $validated['customer_name'],
-            'cus_token' => $validated['customer_token'],
-            'cus_email' => $validated['customer_email'],
-            'cus_add1' => $validated['cutomer_addr'],
+            'cus_name' => Str::limit($user->name, 50, ''),
+            'cus_token' => $user->token_no,
+            'cus_email' => $user->email,
+            'cus_add1' => $address,
             'cus_add2' => '',
             'cus_city' => 'Dhaka',
             'cus_state' => '',
             'cus_postcode' => '1000',
             'cus_country' => 'Bangladesh',
-            'cus_phone' => $validated['customer_mobile'],
+            'cus_phone' => $user->phone,
             'cus_fax' => '',
-            'ship_name' => 'Canteen',
-            'ship_add1' => $validated['cutomer_addr'],
+            'ship_name' => Str::limit($tenant->name, 50, ''),
+            'ship_add1' => $address,
             'ship_add2' => '',
             'ship_city' => 'Dhaka',
             'ship_state' => '',
             'ship_postcode' => '1000',
-            'ship_phone' => $validated['customer_mobile'],
+            'ship_phone' => $user->phone,
             'ship_country' => 'Bangladesh',
             'shipping_method' => 'NO',
             'product_name' => 'Canteen meal payment',
             'product_category' => 'Meal',
             'product_profile' => 'non-physical-goods',
-            'ipn_url' => url('/ipn'),
+            'success_url' => PaymentUrls::backend('/success'),
+            'fail_url' => PaymentUrls::backend('/fail'),
+            'cancel_url' => PaymentUrls::backend('/cancel'),
+            'ipn_url' => PaymentUrls::backend('/ipn'),
         ];
 
-        $gatewayResponse = $sslCommerz->makePayment($paymentData, 'checkout', 'json');
-        $gatewayResponse = is_array($gatewayResponse)
-            ? $gatewayResponse
-            : json_decode((string) $gatewayResponse, true);
-        $gatewayUrl = is_array($gatewayResponse) ? ($gatewayResponse['data'] ?? null) : null;
-
-        if (!is_string($gatewayUrl)
-            || strtolower((string) ($gatewayResponse['status'] ?? '')) !== 'success'
-            || !filter_var($gatewayUrl, FILTER_VALIDATE_URL)
-            || parse_url($gatewayUrl, PHP_URL_SCHEME) !== 'https') {
-            abort(502, 'SSLCommerz could not start the sandbox payment.');
-        }
-
         $now = now('Asia/Dhaka');
-        $tenantId = app(TenantContext::class)->id();
-        if ($tenantId === null) {
-            abort(400, 'A tenant context is required to start payment.');
-        }
         DB::table('payments')->insert([
-            'tenant_id' => $tenantId,
+            'tenant_id' => $tenant->getKey(),
             'year' => $validated['year'],
             'month' => $validated['month'],
-            'name' => $validated['customer_name'],
-            'token_no' => $validated['customer_token'],
-            'email' => $validated['customer_email'],
-            'phone' => $validated['customer_mobile'],
+            'name' => Str::limit($user->name, 50, ''),
+            'token_no' => $user->token_no,
+            'email' => $user->email,
+            'phone' => $user->phone,
             'amount' => $amount,
-            'address' => $validated['cutomer_addr'],
+            'address' => $address,
             'transaction_id' => $transactionId,
             'status' => 'Pending',
             'currency' => 'BDT',
@@ -118,7 +131,23 @@ class SslCommerzPaymentController extends Controller
             'payment_time' => $now->format('h:i:sa'),
         ]);
 
-        return redirect()->away($gatewayUrl);
+        $gatewayResponse = $sslCommerz->makePayment($paymentData, 'checkout', 'json');
+        $gatewayResponse = is_array($gatewayResponse)
+            ? $gatewayResponse
+            : json_decode((string) $gatewayResponse, true);
+        $gatewayResponse = is_array($gatewayResponse) ? $gatewayResponse : [];
+        $gatewayUrl = is_array($gatewayResponse) ? ($gatewayResponse['data'] ?? null) : null;
+
+        if (strtolower((string) ($gatewayResponse['status'] ?? '')) !== 'success'
+            || !PaymentUrls::isTrustedGatewayUrl($gatewayUrl)) {
+            DB::table('payments')
+                ->where('transaction_id', $transactionId)
+                ->where('status', 'Pending')
+                ->update(['status' => 'Failed']);
+            abort(502, 'SSLCommerz could not start the payment.');
+        }
+
+        return response()->json(['gateway_url' => $gatewayUrl]);
     }
 
     public function success(Request $request, SslCommerzNotification $sslCommerz): RedirectResponse
@@ -216,29 +245,31 @@ class SslCommerzPaymentController extends Controller
                 return 'validation_failed';
             }
 
-            DB::table('payments')
-                ->where('tenant_id', $lockedPayment->tenant_id)
-                ->where('id', $lockedPayment->id)
-                ->where('status', 'Pending')
-                ->update(['status' => 'Processing']);
-
             $statement = MonthlyStatement::where([
                 'token_no' => $lockedPayment->token_no,
                 'year' => $lockedPayment->year,
                 'month' => $lockedPayment->month,
             ])->lockForUpdate()->first();
 
-            if ($statement) {
-                $totalPayment = (float) $statement->total_payment + (float) $lockedPayment->amount;
-                $balance = (float) $statement->total_cost - $totalPayment;
-                DB::table('monthly_statements')
-                    ->where('tenant_id', $lockedPayment->tenant_id)
-                    ->where('id', $statement->id)->update([
-                    'total_payment' => $totalPayment,
-                    'give' => max($balance, 0),
-                    'take' => max(-$balance, 0),
-                ]);
+            if (!$statement) {
+                return 'invalid';
             }
+
+            DB::table('payments')
+                ->where('tenant_id', $lockedPayment->tenant_id)
+                ->where('id', $lockedPayment->id)
+                ->where('status', 'Pending')
+                ->update(['status' => 'Processing']);
+
+            $totalPayment = (float) $statement->total_payment + (float) $lockedPayment->amount;
+            $balance = (float) $statement->total_cost - $totalPayment;
+            DB::table('monthly_statements')
+                ->where('tenant_id', $lockedPayment->tenant_id)
+                ->where('id', $statement->id)->update([
+                'total_payment' => $totalPayment,
+                'give' => max($balance, 0),
+                'take' => max(-$balance, 0),
+            ]);
 
             return 'completed';
         });
@@ -267,6 +298,17 @@ class SslCommerzPaymentController extends Controller
 
     private function paymentSummaryUrl(string $status): string
     {
-        return rtrim(config('app.frontend_url'), '/').'/payment_summary?payment='.urlencode($status);
+        $transactionId = request()->input('tran_id');
+        $payment = is_string($transactionId)
+            ? DB::table('payments')->where('transaction_id', $transactionId)->first()
+            : null;
+        $tenant = $payment ? Tenant::query()->find($payment->tenant_id) : null;
+        if (!$tenant) {
+            return PaymentUrls::frontend('/login', ['payment' => $status]);
+        }
+
+        return PaymentUrls::frontend('/t/'.rawurlencode($tenant->slug).'/payment_summary', [
+            'payment' => $status,
+        ]);
     }
 }

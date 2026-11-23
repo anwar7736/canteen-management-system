@@ -1,7 +1,4 @@
 export const PAYMENT_OPTIONS_KEY = 'canteen-payment-options';
-export const ONLINE_PAYMENT_URL = process.env.NODE_ENV === 'development'
-  ? 'http://127.0.0.1:8000/online-payment'
-  : 'https://canteen-api.coderanwar.online/online-payment';
 
 export type PaymentOptions = {
   qrEnabled: boolean;
@@ -14,7 +11,7 @@ export type PaymentOptions = {
 export const DEFAULT_PAYMENT_OPTIONS: PaymentOptions = {
   qrEnabled: true,
   manualEnabled: true,
-  qrPayload: ONLINE_PAYMENT_URL,
+  qrPayload: '',
   manualAccount: '',
   manualInstructions: '',
 };

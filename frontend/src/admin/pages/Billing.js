@@ -3,6 +3,35 @@ import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import API from '../api/api';
 
+function getPaymentResultNotice(result, payment, subscription) {
+    const paymentStatus = String(payment?.status || '').toLowerCase();
+
+    if (result === 'completed' || result === 'already_completed') {
+        if (paymentStatus === 'complete' && subscription?.status === 'active') {
+            return {type: 'success', message: 'Payment successful. Your subscription is active.'};
+        }
+        if (paymentStatus === 'pending') {
+            return {type: 'warning', message: 'Payment is still being verified. Your subscription has not been activated yet.'};
+        }
+        return {type: 'warning', message: 'We could not confirm the payment. Check payment history before trying again.'};
+    }
+
+    if (result === 'failed' && paymentStatus === 'failed') {
+        return {type: 'danger', message: 'Payment failed. Your subscription has not changed.'};
+    }
+    if (result === 'canceled' && paymentStatus === 'canceled') {
+        return {type: 'info', message: 'Payment canceled. No subscription changes were made.'};
+    }
+    if (result === 'validation_failed' || paymentStatus === 'pending') {
+        return {type: 'warning', message: 'SSLCommerz could not verify the payment yet. Your subscription is unchanged; if you were charged, contact support before retrying.'};
+    }
+    if (result) {
+        return {type: 'danger', message: 'We could not confirm this payment. Check payment history or contact support.'};
+    }
+
+    return null;
+}
+
 class Billing extends Component {
     state = {
         plans: [],
@@ -10,22 +39,32 @@ class Billing extends Component {
         payments: [],
         pending: false,
         error: '',
+        resultNotice: null,
     };
 
     componentDidMount() {
-        this.loadBilling();
+        const result = new URLSearchParams(window.location.search).get('subscription');
+        if (result) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('subscription');
+            window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+        }
+        this.loadBilling(result);
     }
 
-    loadBilling = async () => {
+    loadBilling = async (result = null) => {
         try {
             const [plansResponse, subscriptionResponse] = await Promise.all([
             Axios.get(API.GetSubscriptionPlans),
             Axios.get(API.GetTenantSubscription),
             ]);
+            const subscription = subscriptionResponse.data?.subscription || null;
+            const payments = subscriptionResponse.data?.payments || [];
             this.setState({
                 plans: plansResponse.data || [],
-                subscription: subscriptionResponse.data?.subscription || null,
-                payments: subscriptionResponse.data?.payments || [],
+                subscription,
+                payments,
+                resultNotice: getPaymentResultNotice(result, payments[0], subscription),
             });
         } catch (error) {
             this.setState({
@@ -52,7 +91,7 @@ class Billing extends Component {
     };
 
     render() {
-        const {plans, subscription, payments, pending, error} = this.state;
+        const {plans, subscription, payments, pending, error, resultNotice} = this.state;
         const subscriptionStatus = subscription?.status || 'unconfigured';
         const periodEnd = subscription?.current_period_end
             ? new Date(subscription.current_period_end).toLocaleDateString()
@@ -63,6 +102,11 @@ class Billing extends Component {
                 <div className="container-fluid animated zoomIn">
                     <h4 className="text-success text-center p-2 my-2">Subscription & Billing</h4>
                     {error && <div className="alert alert-danger">{error}</div>}
+                    {resultNotice && (
+                        <div className={`alert alert-${resultNotice.type}`} role="alert">
+                            {resultNotice.message}
+                        </div>
+                    )}
                     <div className="card mb-4">
                         <div className="card-body">
                             <h5 className="card-title">Current subscription</h5>

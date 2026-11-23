@@ -10,9 +10,11 @@ Route::view('/', 'welcome');
 
     // SSLCOMMERZ Start
     // Route::get('/example1', [SslCommerzPaymentController::class, 'exampleEasyCheckout']);
-    Route::get('/online-payment', [SslCommerzPaymentController::class, 'onlineSSLPayment']);
+    Route::get('/online-payment', [SslCommerzPaymentController::class, 'onlineSSLPayment'])
+        ->middleware('throttle:60,1');
 
-    Route::post('/pay', [SslCommerzPaymentController::class, 'index']);
+    Route::post('/pay', [SslCommerzPaymentController::class, 'index'])
+        ->middleware('throttle:10,1');
     // Route::post('/pay-via-ajax', [SslCommerzPaymentController::class, 'payViaAjax']);
 
     Route::post('/success', [SslCommerzPaymentController::class, 'success']);

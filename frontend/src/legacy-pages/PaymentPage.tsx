@@ -4,18 +4,29 @@ import Footer from '../components/footer';
 import {Navigate} from 'react-router-dom';
 import {QRCodeSVG} from 'qrcode.react';
 import {toast} from 'sonner';
+import Axios from 'axios';
+import API from '../api/API';
 import {
     DEFAULT_PAYMENT_OPTIONS,
-    ONLINE_PAYMENT_URL,
     PAYMENT_OPTIONS_KEY,
     type PaymentOptions,
 } from '../lib/payment-options';
+
+const PAYMENT_MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 class PaymentPage extends Component {
     state = {
         redirectStatus: false,
         paymentOptions: DEFAULT_PAYMENT_OPTIONS,
         selectedMethod: 'qr',
+        selectedYear: String(new Date().getFullYear()),
+        selectedMonth: PAYMENT_MONTHS[new Date().getMonth()],
+        amount: '',
+        checkoutPending: false,
+        checkoutError: '',
     };
 
     componentDidMount() {
@@ -48,8 +59,55 @@ class PaymentPage extends Component {
         }
     };
 
+    startOnlinePayment = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const {selectedYear, selectedMonth, amount} = this.state;
+        const numericAmount = Number(amount);
+        if (!amount || !Number.isFinite(numericAmount) || numericAmount < 10 || numericAmount > 500000) {
+            this.setState({checkoutError: 'Enter an amount between BDT 10 and BDT 500,000.'});
+            return;
+        }
+
+        this.setState({checkoutPending: true, checkoutError: ''});
+        try {
+            const response = await Axios.post(API.StartMemberPayment, {
+                year: Number(selectedYear),
+                month: selectedMonth,
+                amount: numericAmount.toFixed(2),
+            });
+            const gatewayUrl = response.data?.gateway_url;
+            if (typeof gatewayUrl !== 'string') {
+                throw new Error('SSLCommerz did not return a checkout URL.');
+            }
+
+            const parsedUrl = new URL(gatewayUrl);
+            if (
+                parsedUrl.protocol !== 'https:'
+                || !['sandbox.sslcommerz.com', 'securepay.sslcommerz.com'].includes(parsedUrl.hostname)
+            ) {
+                throw new Error('The payment provider returned an untrusted URL.');
+            }
+
+            window.location.assign(parsedUrl.href);
+        } catch (error) {
+            const message = error?.response?.data?.message
+                || error.message
+                || 'Unable to start online payment.';
+            this.setState({checkoutError: message, checkoutPending: false});
+        }
+    };
+
     render() {
-        const {redirectStatus, paymentOptions, selectedMethod} = this.state;
+        const {
+            redirectStatus,
+            paymentOptions,
+            selectedMethod,
+            selectedYear,
+            selectedMonth,
+            amount,
+            checkoutPending,
+            checkoutError,
+        } = this.state;
         const options = paymentOptions as PaymentOptions;
         const methods = [
             ...(options.qrEnabled ? [{id: 'qr', label: 'Scan QR'}] : []),
@@ -58,7 +116,13 @@ class PaymentPage extends Component {
         const activeMethod = methods.some((method) => method.id === selectedMethod)
             ? selectedMethod
             : methods[0]?.id;
-        const qrPayload = options.qrPayload || ONLINE_PAYMENT_URL;
+        const configuredQrPayload = options.qrPayload;
+        const fallbackQrPayload = typeof window === 'undefined'
+            ? '/make_payment'
+            : `${window.location.origin}${window.location.pathname}`;
+        const qrPayload = !configuredQrPayload || /\/online-payment\/?$/.test(configuredQrPayload)
+            ? fallbackQrPayload
+            : configuredQrPayload;
 
         return (
             <Fragment>
@@ -70,7 +134,7 @@ class PaymentPage extends Component {
                         <p className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-emerald-700">Payments</p>
                         <h1 className="m-0 text-3xl font-bold text-[var(--text-primary)]">Make a payment</h1>
                         <p className="mt-2 text-[var(--text-secondary)]">
-                            Choose a payment option or continue with the existing online payment service.
+                            Choose a payment option or securely pay your own monthly statement through SSLCommerz.
                         </p>
                     </div>
 
@@ -154,20 +218,54 @@ class PaymentPage extends Component {
                             <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-xl text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
                                 ↗
                             </div>
-                            <h2 className="text-lg font-bold text-[var(--text-primary)]">Online payment</h2>
+                            <h2 className="text-lg font-bold text-[var(--text-primary)]">Secure online payment</h2>
                             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                                Continue to the existing secure payment page to complete your transaction.
+                                Choose a statement period and amount. Account details are loaded from your signed-in account.
                             </p>
-                            <a
-                                className="btn btn-success mt-4 flex w-full items-center justify-center"
-                                href={ONLINE_PAYMENT_URL}
-                                target="_blank"
-                                rel="noreferrer"
-                            >
-                                Continue to payment
-                            </a>
+                            <form className="mt-4 space-y-3" onSubmit={this.startOnlinePayment}>
+                                <label className="block text-sm font-medium text-[var(--text-primary)]">
+                                    Statement year
+                                    <select
+                                        className="form-control mt-1"
+                                        value={selectedYear}
+                                        onChange={(event) => this.setState({selectedYear: event.target.value})}
+                                    >
+                                        {[0, 1, 2].map((offset) => {
+                                            const year = String(new Date().getFullYear() - offset);
+                                            return <option key={year} value={year}>{year}</option>;
+                                        })}
+                                    </select>
+                                </label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)]">
+                                    Statement month
+                                    <select
+                                        className="form-control mt-1"
+                                        value={selectedMonth}
+                                        onChange={(event) => this.setState({selectedMonth: event.target.value})}
+                                    >
+                                        {PAYMENT_MONTHS.map((month) => <option key={month} value={month}>{month}</option>)}
+                                    </select>
+                                </label>
+                                <label className="block text-sm font-medium text-[var(--text-primary)]">
+                                    Amount (BDT)
+                                    <input
+                                        className="form-control mt-1"
+                                        type="number"
+                                        min="10"
+                                        max="500000"
+                                        step="0.01"
+                                        value={amount}
+                                        onChange={(event) => this.setState({amount: event.target.value, checkoutError: ''})}
+                                        required
+                                    />
+                                </label>
+                                {checkoutError && <p className="m-0 text-sm text-red-600" role="alert">{checkoutError}</p>}
+                                <button className="btn btn-success w-full" type="submit" disabled={checkoutPending}>
+                                    {checkoutPending ? 'Starting secure checkout…' : 'Continue to SSLCommerz'}
+                                </button>
+                            </form>
                             <p className="mb-0 mt-3 text-xs leading-5 text-[var(--text-secondary)]">
-                                Never share your password or one-time verification code.
+                                Card details are entered only on SSLCommerz. Never share your password or one-time verification code.
                             </p>
                         </aside>
                     </div>

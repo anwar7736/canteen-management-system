@@ -27,6 +27,7 @@ class API {
 	static RestoreTodayOrder  = this.baseURL + "RestoreTodayOrderedMeal/";
 	static GetAllMealByUser  = this.baseURL + "GetAllMealByUser/";
 	static PaymentDetailsByUser  = this.baseURL + "PaymentDetailsByUser/";
+	static StartMemberPayment = this.baseURL + "member/payment/checkout";
 	static PaymentDetailsFilterByDate  = this.baseURL + "PaymentDetailsFilterByDate";
 	static GetMealFilterByDate  = this.baseURL + "GetMealFilterByDate/";
 	static CountDashboardSummary  = this.baseURL + "CountDashboardSummary/";

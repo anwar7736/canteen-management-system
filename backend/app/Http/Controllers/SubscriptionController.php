@@ -8,7 +8,9 @@ use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\TenantSubscription;
 use App\Models\User;
+use App\Support\PaymentUrls;
 use App\Tenancy\TenantContext;
+use App\Tenancy\TenantScope;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -100,32 +102,17 @@ class SubscriptionController extends Controller
             'product_name' => $plan->name.' subscription',
             'product_category' => 'SaaS subscription',
             'product_profile' => 'non-physical-goods',
-            'success_url' => url('/subscription/success'),
-            'fail_url' => url('/subscription/fail'),
-            'cancel_url' => url('/subscription/cancel'),
-            'ipn_url' => url('/subscription/ipn'),
+            'success_url' => PaymentUrls::backend('/subscription/success'),
+            'fail_url' => PaymentUrls::backend('/subscription/fail'),
+            'cancel_url' => PaymentUrls::backend('/subscription/cancel'),
+            'ipn_url' => PaymentUrls::backend('/subscription/ipn'),
         ];
-
-        $gatewayResponse = $sslCommerz->makePayment($paymentData, 'checkout', 'json');
-        $gatewayResponse = is_array($gatewayResponse)
-            ? $gatewayResponse
-            : json_decode((string) $gatewayResponse, true);
-        $gatewayUrl = is_array($gatewayResponse) ? ($gatewayResponse['data'] ?? null) : null;
-
-        if (
-            !is_string($gatewayUrl) ||
-            strtolower((string) ($gatewayResponse['status'] ?? '')) !== 'success' ||
-            !filter_var($gatewayUrl, FILTER_VALIDATE_URL) ||
-            parse_url($gatewayUrl, PHP_URL_SCHEME) !== 'https'
-        ) {
-            abort(502, 'SSLCommerz could not start the subscription payment.');
-        }
 
         $subscription = TenantSubscription::query()
             ->where('tenant_id', $tenant->getKey())
             ->latest('id')
             ->firstOrFail();
-        SubscriptionPayment::create([
+        $payment = SubscriptionPayment::create([
             'tenant_id' => $tenant->getKey(),
             'subscription_id' => $subscription->getKey(),
             'plan_id' => $plan->getKey(),
@@ -137,6 +124,21 @@ class SubscriptionController extends Controller
             'period_start' => $periodStart,
             'period_end' => $periodEnd,
         ]);
+
+        $gatewayResponse = $sslCommerz->makePayment($paymentData, 'checkout', 'json');
+        $gatewayResponse = is_array($gatewayResponse)
+            ? $gatewayResponse
+            : json_decode((string) $gatewayResponse, true);
+        $gatewayResponse = is_array($gatewayResponse) ? $gatewayResponse : [];
+        $gatewayUrl = is_array($gatewayResponse) ? ($gatewayResponse['data'] ?? null) : null;
+
+        if (
+            strtolower((string) ($gatewayResponse['status'] ?? '')) !== 'success'
+            || !PaymentUrls::isTrustedGatewayUrl($gatewayUrl)
+        ) {
+            $payment->update(['status' => 'Failed']);
+            abort(502, 'SSLCommerz could not start the subscription payment.');
+        }
 
         return response()->json(['gateway_url' => $gatewayUrl]);
     }
@@ -179,12 +181,21 @@ class SubscriptionController extends Controller
             return 'invalid';
         }
 
-        $payment = SubscriptionPayment::query()
+        $payment = SubscriptionPayment::withoutGlobalScope(TenantScope::class)
             ->where('transaction_id', $transactionId)
             ->first();
         if (!$payment) {
             return 'invalid';
         }
+
+        $tenant = Tenant::query()
+            ->whereKey($payment->tenant_id)
+            ->where('status', 'active')
+            ->first();
+        if (!$tenant) {
+            return 'invalid';
+        }
+        app(TenantContext::class)->set($tenant);
 
         if ($payment->status === 'Complete') {
             return 'already_completed';
@@ -259,7 +270,7 @@ class SubscriptionController extends Controller
             return;
         }
 
-        SubscriptionPayment::query()
+        SubscriptionPayment::withoutGlobalScope(TenantScope::class)
             ->where('transaction_id', $transactionId)
             ->where('status', 'Pending')
             ->update(['status' => $status]);
@@ -276,15 +287,18 @@ class SubscriptionController extends Controller
     {
         $transactionId = request()->input('tran_id');
         $payment = is_string($transactionId)
-            ? SubscriptionPayment::query()->where('transaction_id', $transactionId)->first()
+            ? SubscriptionPayment::withoutGlobalScope(TenantScope::class)
+                ->where('transaction_id', $transactionId)
+                ->first()
             : null;
         $tenant = $payment ? Tenant::query()->find($payment->tenant_id) : null;
         $slug = $tenant?->slug;
         if (!$slug) {
-            return rtrim(config('app.frontend_url'), '/').'/subscription-result?status='.urlencode($status);
+            return PaymentUrls::frontend('/login', ['subscription' => $status]);
         }
 
-        return rtrim(config('app.frontend_url'), '/').'/t/'.rawurlencode($slug)
-            .'/admin/billing?subscription='.urlencode($status);
+        return PaymentUrls::frontend('/t/'.rawurlencode($slug).'/admin/billing', [
+            'subscription' => $status,
+        ]);
     }
 }

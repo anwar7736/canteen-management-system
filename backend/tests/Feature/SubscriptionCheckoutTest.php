@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Library\SslCommerz\SslCommerzNotification;
+use App\Models\SubscriptionPayment;
 use App\Models\SubscriptionPlan;
 use App\Models\Tenant;
 use App\Models\TenantSubscription;
 use App\Models\User;
+use App\Support\PaymentUrls;
+use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -108,5 +111,99 @@ class SubscriptionCheckoutTest extends TestCase
         $this->assertSame(url('/success'), $legacyInfo['success_url']);
         $this->assertSame(url('/fail'), $legacyInfo['fail_url']);
         $this->assertSame(url('/cancel'), $legacyInfo['cancel_url']);
+    }
+
+    public function test_success_callback_resolves_tenant_and_activates_subscription_once(): void
+    {
+        [$tenant, $payment, $subscription] = $this->createPendingSubscriptionPayment();
+        $this->mock(SslCommerzNotification::class, function ($mock) use ($payment) {
+            $mock->shouldReceive('orderValidate')
+                ->once()
+                ->withArgs(function (array $data, string $transactionId, $amount, string $currency) use ($payment) {
+                    return $transactionId === $payment->transaction_id
+                        && (float) $amount === 1000.0
+                        && $currency === 'BDT';
+                })
+                ->andReturnTrue();
+        });
+
+        app(TenantContext::class)->clear();
+        $this->post('/subscription/success', ['tran_id' => $payment->transaction_id])
+            ->assertRedirect(PaymentUrls::frontend(
+                '/t/'.$tenant->slug.'/admin/billing',
+                ['subscription' => 'completed']
+            ));
+        $this->post('/subscription/success', ['tran_id' => $payment->transaction_id])
+            ->assertRedirect(PaymentUrls::frontend(
+                '/t/'.$tenant->slug.'/admin/billing',
+                ['subscription' => 'already_completed']
+            ));
+
+        $this->assertDatabaseHas('subscription_payments', [
+            'id' => $payment->id,
+            'status' => 'Complete',
+        ]);
+        $this->assertDatabaseHas('tenant_subscriptions', [
+            'id' => $subscription->id,
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_invalid_subscription_callback_leaves_payment_and_subscription_unchanged(): void
+    {
+        [$tenant, $payment, $subscription] = $this->createPendingSubscriptionPayment();
+        $this->mock(SslCommerzNotification::class, function ($mock) {
+            $mock->shouldReceive('orderValidate')->once()->andReturnFalse();
+        });
+
+        app(TenantContext::class)->clear();
+        $this->post('/subscription/success', ['tran_id' => $payment->transaction_id])
+            ->assertRedirect(PaymentUrls::frontend(
+                '/t/'.$tenant->slug.'/admin/billing',
+                ['subscription' => 'validation_failed']
+            ));
+
+        $this->assertDatabaseHas('subscription_payments', [
+            'id' => $payment->id,
+            'status' => 'Pending',
+        ]);
+        $this->assertDatabaseHas('tenant_subscriptions', [
+            'id' => $subscription->id,
+            'status' => 'trialing',
+        ]);
+    }
+
+    private function createPendingSubscriptionPayment(): array
+    {
+        $tenant = Tenant::create([
+            'name' => 'Callback Canteen',
+            'slug' => 'callback-canteen-'.strtolower(\Illuminate\Support\Str::random(6)),
+            'status' => 'active',
+        ]);
+        $plan = SubscriptionPlan::create([
+            'name' => 'Callback Pro',
+            'slug' => 'callback-pro-'.strtolower(\Illuminate\Support\Str::random(6)),
+            'price' => 1000,
+            'currency' => 'BDT',
+            'interval' => 'monthly',
+            'active' => true,
+        ]);
+        $subscription = TenantSubscription::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $plan->id,
+            'status' => 'trialing',
+        ]);
+        $payment = SubscriptionPayment::create([
+            'tenant_id' => $tenant->id,
+            'subscription_id' => $subscription->id,
+            'plan_id' => $plan->id,
+            'amount' => 1000,
+            'currency' => 'BDT',
+            'transaction_id' => 'CALLBACK-'.strtoupper(\Illuminate\Support\Str::random(20)),
+            'status' => 'Pending',
+            'gateway' => 'sslcommerz',
+        ]);
+
+        return [$tenant, $payment, $subscription];
     }
 }
