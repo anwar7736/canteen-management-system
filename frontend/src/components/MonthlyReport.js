@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
-import DataTable from "react-data-table-component";
+import ResponsiveDataTable from './ResponsiveDataTable';
 import Axios from 'axios';
 import API from '../api/API';
 import cogoToast from '../utils/cogoToast';
@@ -175,7 +175,7 @@ class MonthlyReport extends React.Component{
                     </div>
                 <hr/>
   
-                    <DataTable
+                    <ResponsiveDataTable
                         noHeader={true}
                         paginationPerPage={5}
                         pagination={true}

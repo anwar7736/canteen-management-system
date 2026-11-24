@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
-import DataTable from "react-data-table-component";
+import ResponsiveDataTable from './ResponsiveDataTable';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
     faBowlFood, faCalendarDays, faCoins, faEnvelope,
@@ -259,7 +259,7 @@ class Dashboard extends React.Component{
             </div>
             <section className="dashboard-table-section">
                 <h5>Last 7 days · meal summary</h5>
-                    <DataTable
+                    <ResponsiveDataTable
                         noHeader={true}
                         paginationPerPage={5}
                         pagination={true}
@@ -269,7 +269,7 @@ class Dashboard extends React.Component{
             </section>
             <section className="dashboard-table-section">
                     <h6>Recent payments</h6>
-                    <DataTable
+                    <ResponsiveDataTable
                         noHeader={true}
                         paginationPerPage={5}
                         pagination={true}
@@ -279,7 +279,7 @@ class Dashboard extends React.Component{
             </section>
             <section className="dashboard-table-section">
                 <h6>Monthly statements</h6>
-                    <DataTable
+                    <ResponsiveDataTable
                         noHeader={true}
                         paginationPerPage={5}
                         pagination={true}

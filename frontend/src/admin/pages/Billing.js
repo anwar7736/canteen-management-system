@@ -145,17 +145,17 @@ class Billing extends Component {
                                 <p className="text-muted mb-0">No subscription payments yet.</p>
                             ) : (
                                 <div className="table-responsive">
-                                    <table className="table">
+                                    <table className="table responsive-card-table">
                                         <thead>
                                             <tr><th>Transaction</th><th>Amount</th><th>Status</th><th>Date</th></tr>
                                         </thead>
                                         <tbody>
                                             {payments.map((payment) => (
                                                 <tr key={payment.id}>
-                                                    <td>{payment.transaction_id}</td>
-                                                    <td>{payment.currency} {Number(payment.amount).toLocaleString()}</td>
-                                                    <td>{payment.status}</td>
-                                                    <td>{new Date(payment.created_at).toLocaleString()}</td>
+                                                    <td data-label="Transaction">{payment.transaction_id}</td>
+                                                    <td data-label="Amount">{payment.currency} {Number(payment.amount).toLocaleString()}</td>
+                                                    <td data-label="Status">{payment.status}</td>
+                                                    <td data-label="Date">{new Date(payment.created_at).toLocaleString()}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

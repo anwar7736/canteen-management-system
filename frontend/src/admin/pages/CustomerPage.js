@@ -1,7 +1,7 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Modal, Form, Container} from 'react-bootstrap';
 import SideBar from '../components/SideBar';
-import DataTable from 'react-data-table-component';
+import ResponsiveDataTable from '../../components/ResponsiveDataTable';
 import Axios from 'axios';
 import cogoToast from '../../utils/cogoToast';
 import { Navigate } from 'react-router-dom';
@@ -276,7 +276,7 @@ class CustomerPage extends Component {
                         <Button onClick={this.modalOpen.bind(this, 'Update')} variant="info" className="btn-sm m-1" disabled={this.state.isDisabled}>Edit</Button>
                         <Button onClick={this.onDelete} variant="danger" className="btn-sm m-1" disabled={this.state.isDisabled}>Delete</Button>
                         <Button onClick={this.print} variant="primary" className="btn-sm m-1" disabled={this.state.isDisabled}>Print Token</Button><br/><br/>
-                        <DataTable
+                        <ResponsiveDataTable
                             keyField="id"
                             data={allData}
                             columns={columns}

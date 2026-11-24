@@ -2317,6 +2317,139 @@ body {
     white-space: nowrap;
   }
 
+  .responsive-data-table .rdt_Table {
+    overflow: visible;
+    background: transparent;
+  }
+
+  .responsive-data-table .rdt_TableHead {
+    display: none;
+  }
+
+  .responsive-data-table .rdt_TableBody {
+    display: grid;
+    gap: 12px;
+    background: transparent;
+  }
+
+  .responsive-data-table .rdt_TableRow {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--border) !important;
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 8px 20px rgb(15 23 42 / 6%);
+  }
+
+  .responsive-data-table .rdt_TableCell {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    padding: 0 14px;
+    white-space: normal;
+  }
+
+  .responsive-data-table .rdt_TableCell:not(:first-child) {
+    border-top: 1px solid var(--border);
+  }
+
+  .responsive-data-table .rdt_TableCell:first-child:not(:has(.responsive-data-cell)) {
+    display: flex;
+    width: 48px;
+    min-height: 0;
+    padding: 8px 0 0 12px;
+    border: 0;
+  }
+
+  .responsive-data-cell {
+    display: flex;
+    width: 100%;
+    min-height: 38px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .responsive-data-cell::before {
+    flex: 0 0 34%;
+    color: var(--text-secondary);
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .045em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .responsive-data-cell > * {
+    max-width: 66%;
+    min-width: 0;
+  }
+
+  .responsive-data-table .rdt_Pagination {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .responsive-card-table {
+    display: block;
+    min-width: 0;
+    border: 0 !important;
+  }
+
+  .responsive-card-table thead {
+    display: none;
+  }
+
+  .responsive-card-table tbody,
+  .responsive-card-table tbody tr,
+  .responsive-card-table tbody td {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-card-table tbody tr {
+    margin: 10px 0;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    background: var(--surface);
+    box-shadow: 0 8px 20px rgb(15 23 42 / 6%);
+  }
+
+  .responsive-card-table tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 2px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+    text-align: right;
+    white-space: normal !important;
+  }
+
+  .responsive-card-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .responsive-card-table tbody td::before {
+    flex: 0 0 38%;
+    color: var(--text-secondary);
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
   .user-page-main .transaction-preview,
   .admin-app-main .transaction-preview {
     padding: 15px;

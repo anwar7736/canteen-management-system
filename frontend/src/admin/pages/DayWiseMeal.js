@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
-import DataTable from "react-data-table-component";
+import ResponsiveDataTable from '../../components/ResponsiveDataTable';
 import Axios from 'axios';
 import API from './../api/api';
 import cogoToast from '../../utils/cogoToast';
@@ -246,7 +246,7 @@ class DayWiseMeal extends React.Component{
                             <button onClick={this.resetForm} className="btn btn-sm btn-danger m-2">Refresh</button>
                        </div>
                     </div>
-                    <DataTable
+                    <ResponsiveDataTable
                         noHeader={true}
                         paginationPerPage={5}
                         pagination={true}

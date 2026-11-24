@@ -51,10 +51,10 @@ class DailyMealItem extends React.Component{
  		return (
  			<>
  				<tr>
- 					<td>{serial++}</td>
-	 				<td>{item.day}</td>
-	 				<td>{item.lunch_item}</td>
-	 				<td>{item.dinner_item}</td>
+                    <td data-label="সিরিয়াল">{serial++}</td>
+                    <td data-label="বার">{item.day}</td>
+                    <td data-label="দুপুরের মেন্যু">{item.lunch_item}</td>
+                    <td data-label="রাতের মেন্যু">{item.dinner_item}</td>
 	 			</tr>
  			</>
  		)
@@ -70,7 +70,7 @@ class DailyMealItem extends React.Component{
  					<h3 className="text-center text-success mt-4">প্রতিদিনের খাবারের মেন্যুসমূহ নিচে দেওয়া হলঃ-</h3><br/>
  					<h6 className="text-center text-danger">প্রয়োজন অনুসারে এই তালিকা পরিবর্তন হতে পারে</h6><br/>
  					<div class="table-responsive col-md-10 offset-md-1 text-center">
- 						<table class="table table-bordered table-striped">
+                        <table class="table table-bordered table-striped responsive-card-table">
 					  <thead style={{fontSize:'13.5px'}} className="bg-dark text-white">
 					    <tr>
 					      <th scope="col">সিরিয়াল</th>

@@ -1,6 +1,6 @@
 import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Modal, Row} from "react-bootstrap";
-import DataTable from "react-data-table-component";
+import ResponsiveDataTable from './ResponsiveDataTable';
 import Axios from 'axios';
 import API from '../api/API';
 import confirmAction from '../utils/confirmAction';
@@ -289,7 +289,7 @@ class UserList extends React.Component{
                                            <p className= {undoBtn + " text-center text-success"} > <strong>Your today order has been deleted!</strong> <span className="text-danger" onClick={this.restoreOrder} style={{cursor:'pointer'}}>Undo</span></p>
                                             <center><button onClick={this.handleOpen} className="btn btn-info" disabled={isDisabled}>Order Today Meal</button></center>
                                             <hr className="bg-secondary"/>
-                                                <DataTable
+                                                <ResponsiveDataTable
                                                     noHeader={true}
                                                     paginationPerPage={5}
                                                     pagination={true}

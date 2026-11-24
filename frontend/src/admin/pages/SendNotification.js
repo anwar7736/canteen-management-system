@@ -7,7 +7,7 @@ import {Link} from "react-router-dom";
 import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import confirmAction from '../../utils/confirmAction';
-import DataTable from "react-data-table-component";
+import ResponsiveDataTable from '../../components/ResponsiveDataTable';
 import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 class SendNotification extends React.Component{
@@ -431,7 +431,7 @@ EditNotification=()=>{
 		<div class="">
 			<div class=" m-4">
 			<h4 className="text-danger"><center>All Sending Notification List</center></h4><hr/>
-				  <DataTable
+				  <ResponsiveDataTable
 	                noHeader={true}
 	                paginationPerPage={5}
 	                pagination={true}

@@ -189,11 +189,11 @@ class DailyMealItem extends React.Component{
  		return (
  			<>
  				<tr>
- 					<td>{serial++}</td>
-	 				<td>{item.day}</td>
-	 				<td>{item.lunch_item}</td>
-	 				<td>{item.dinner_item}</td>
-	 				<td><button onClick={()=>this.handleItemOpen(item.id)} className="btn btn-success btn-sm">à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨</button></td>
+                    <td data-label="Serial">{serial++}</td>
+                    <td data-label="Day">{item.day}</td>
+                    <td data-label="Lunch menu">{item.lunch_item}</td>
+                    <td data-label="Dinner menu">{item.dinner_item}</td>
+                    <td data-label="Actions"><button onClick={()=>this.handleItemOpen(item.id)} className="btn btn-success btn-sm">à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨</button></td>
 	 			</tr>
  			</>
  		)
@@ -211,7 +211,7 @@ class DailyMealItem extends React.Component{
  					</center>
  					<h4 className="text-center text-danger mt-4">à¦ªà§à¦°à¦¤à¦¿à¦¦à¦¿à¦¨à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§à¦¸à¦®à§‚à¦¹ à¦¨à¦¿à¦šà§‡ à¦¦à§‡à¦“à§Ÿà¦¾ à¦¹à¦²à¦ƒ-</h4><br/>
  					<div class="table-responsive col-md-10 offset-md-1 text-center">
- 						<table class="table table-bordered table-striped">
+                        <table class="table table-bordered table-striped responsive-card-table">
 					  <thead style={{fontSize:'13.5px'}} className="bg-dark text-white">
 					    <tr>
 					      <th scope="col">à¦¸à¦¿à¦°à¦¿à§Ÿà¦¾à¦²</th>
