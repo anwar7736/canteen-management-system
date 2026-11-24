@@ -75,6 +75,7 @@ async function authorizeLogin(credentials: Record<string, string>): Promise<Logi
         name: String(record.name || username),
         email: typeof record.email === 'string' ? record.email : null,
         role,
+        tenantSlug,
         token_no: typeof record.token_no === 'number' || typeof record.token_no === 'string'
           ? String(record.token_no)
           : undefined,

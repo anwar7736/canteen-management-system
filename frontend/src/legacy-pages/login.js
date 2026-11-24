@@ -3,6 +3,7 @@ import NavBar from '../components/Navbar';
 import SiteLogin from '../components/login';
 import Footer from '../components/footer';
 import {Navigate} from 'react-router-dom';
+import {getSession} from 'next-auth/react';
 
 class Login extends React.Component{
 	constructor(){
@@ -13,18 +14,29 @@ class Login extends React.Component{
 
 		}
 
-	componentDidMount(){
-		   if(localStorage.getItem('login')!=null)
-            {
-                this.setState({redirectStatus : true});
-            }
+	async componentDidMount(){
+		const tenantSlug = window.location.pathname.match(/^\/t\/([^/]+)/)?.[1];
+		if (!tenantSlug) return;
+
+		try {
+			const session = await getSession();
+			if (session?.user?.role === 'user' && session.user.tenantSlug === decodeURIComponent(tenantSlug)) {
+				this.setState({redirectStatus: true});
+			}
+		} catch (error) {
+			console.error('Unable to verify the current member session:', error);
+		}
 	}
 
 	RedirectToHomePage=()=>{
 		if(this.state.redirectStatus==true)
 		{
+			const callbackUrl = new URLSearchParams(window.location.search).get('callbackUrl');
+			const callbackPath = callbackUrl?.startsWith('/') && !callbackUrl.startsWith('//') && !callbackUrl.startsWith('/admin')
+				? callbackUrl
+				: '/';
 			return (
-					<Navigate to="/" />
+					<Navigate to={callbackPath} replace />
 					);
 		}
 	}

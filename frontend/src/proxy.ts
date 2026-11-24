@@ -19,6 +19,7 @@ export async function proxy(request: NextRequest) {
   if (!tenantMatch && !isPlatformRoute && !isRootAdminRoute) return NextResponse.next();
 
   const tenantSlug = tenantMatch ? decodeURIComponent(tenantMatch[1]) : null;
+  const tenantBasePath = tenantMatch ? `/t/${tenantMatch[1]}` : '';
   const tenantPath = tenantMatch ? tenantMatch[2] || '/' : pathname;
   const isAdminRoute = isPlatformRoute || isRootAdminRoute || tenantPath === '/admin' || tenantPath.startsWith('/admin/');
   const isPublicRootAdminPath = isRootAdminRoute && (
@@ -74,7 +75,7 @@ export async function proxy(request: NextRequest) {
     ? '/platform/login'
     : isRootAdminRoute
       ? '/admin/login'
-      : `${tenantMatch?.[0]}${isAdminRoute ? '/admin/login' : '/login'}`;
+      : `${tenantBasePath}${isAdminRoute ? '/admin/login' : '/login'}`;
   const signInUrl = new URL(signInPath, request.url);
   signInUrl.searchParams.set('callbackUrl', tenantMatch ? tenantPath : pathname);
   return NextResponse.redirect(signInUrl);

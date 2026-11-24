@@ -702,12 +702,14 @@ html.dark .auth-error {
 }
 
 .admin-auth-page {
+  display: grid;
   min-height: 100vh;
-  padding: 24px 16px 40px;
+  place-items: center;
+  padding: clamp(20px, 5vw, 48px);
 }
 
 .admin-auth-page > .login-page-card {
-  margin-top: 0;
+  margin: 0 auto;
 }
 
 .admin-app-main > * {
