@@ -6,6 +6,7 @@ import API from './../api/api';
 import cogoToast from '../../utils/cogoToast';
 import SideBar from '../components/SideBar';
 import Select2Field from '../../components/Select2Field';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 class DayWiseMeal extends React.Component{
         state={
@@ -30,6 +31,8 @@ class DayWiseMeal extends React.Component{
             meal_status : '',
             mainDiv   : '',
             print_view : 'd-none',
+            errors : {},
+            formError : '',
 
         }
 
@@ -47,6 +50,11 @@ class DayWiseMeal extends React.Component{
 
     changeStatus=()=>{
         const {meal_status, order_id} = this.state;
+        if (!meal_status) {
+            this.setState({errors: {meal_status: 'Choose a meal status.'}, formError: ''});
+            return;
+        }
+        this.setState({errors: {}, formError: ''});
         Axios.post(API.ChangeMealStatus, {order_id:order_id, meal_status:meal_status})
          .then(response=>{
             if(response.status == 200 && response.data==1)
@@ -63,16 +71,20 @@ class DayWiseMeal extends React.Component{
 
          })
          .catch(error=>{
-           cogoToast.error('Something went wrong!');
+           const fieldErrors = getFieldErrors(error);
+           this.setState({
+               errors: fieldErrors,
+               formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
+           });
          })
     }
 
     handleClose=()=>{
-        this.setState({show:false, order_id : '', notes : '', lunch:'', dinner:'', order_id:'',token_no:''});
+        this.setState({show:false, order_id : '', notes : '', lunch:'', dinner:'', token_no:'', errors:{}, formError:''});
      }
 
     handleOpen=()=>{
-        this.setState({ show:true});
+        this.setState({show:true, errors: {}, formError: ''});
     }
 
        resetForm=()=>{
@@ -248,7 +260,7 @@ class DayWiseMeal extends React.Component{
                 <br/>
                 <br/>
         </SideBar>
-        <Modal animation={false} className="animated zoomIn" show={show} onHide={show}>
+        <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={this.handleClose}>
                     <Modal.Header>
                         <strong><p className="text-danger">View Order Details</p></strong>
                     </Modal.Header>
@@ -269,11 +281,13 @@ class DayWiseMeal extends React.Component{
                         <label className="form-label"><b>Notes</b></label><br/>
                         <textarea value={notes} disabled className="form-control form-control-sm" placeholder="No notes are available..."/>
                         <label className="form-label"><b>Meal Status</b></label> 
-                        <Select2Field value={meal_status} onChange={(value)=>this.setState({meal_status:value})} ariaLabel="Meal status">
+                        <Select2Field value={meal_status} onChange={(value)=>this.setState({meal_status:value, errors:{}, formError:''})} ariaLabel="Meal status">
                             <option value="Completed">Completed</option>
                             <option value="Processing">Processing</option>
                             <option value="Pending">Pending</option>
                         </Select2Field><br/>
+                        {this.state.errors.meal_status && <p className="field-error" role="alert">{this.state.errors.meal_status}</p>}
+                        {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                     </Modal.Body>
                     <Modal.Footer>
                         <Button className="btn-sm btn-success" onClick={this.changeStatus}>

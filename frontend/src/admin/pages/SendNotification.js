@@ -187,6 +187,7 @@ class SendNotification extends React.Component{
 }
 
 handleOpen=()=>{
+	this.clearForm();
 	this.setState({show:true});
 }
 
@@ -441,7 +442,7 @@ EditNotification=()=>{
 			</div>
 			</div>
  		</SideBar>
- 		<Modal scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={show}>
+        <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={this.handleClose}>
                     <Modal.Header>
                         <strong><p className="text-danger">Edit Notification</p></strong>
                     </Modal.Header>

@@ -6,6 +6,7 @@ import {Navigate} from 'react-router-dom';
 import {Link} from "react-router-dom";
 import Axios from 'axios';
 import SideBar from '../components/SideBar';
+import {getFieldErrors, getFormError} from '../../utils/formValidation';
 
 class DailyMealItem extends React.Component{
 	state = {
@@ -25,6 +26,12 @@ class DailyMealItem extends React.Component{
 		dinner_item : '',
 		item_id : '',
 		redirectStatus : false,
+		errors : {},
+		formError : '',
+		itemErrors : {},
+		itemFormError : '',
+		submittingRate : false,
+		submittingItem : false,
 	}
 	componentDidMount(){
 		let user = localStorage.getItem('login');
@@ -68,23 +75,14 @@ class DailyMealItem extends React.Component{
 
 	onMealEdit=()=>{
 		const {lunch_expiry_time,dinner_expiry_time,lunch_rate, lunch_rate_bangla, dinner_rate, dinner_rate_bangla, meal_rate_id} = this.state;
-		if(lunch_expiry_time=="")
-		{
-			cogoToast.info('à¦¦à§à¦ªà§à¦°à§‡à¦° à¦¸à¦®à§Ÿ à¦¨à¦¿à¦°à§à¦¬à¦¾à¦šà¦¨ à¦•à¦°à§à¦¨!');
-		}
-		else if(dinner_expiry_time=="")
-		{
-			cogoToast.info('à¦°à¦¾à¦¤à§‡à¦° à¦¸à¦®à§Ÿ à¦¨à¦¿à¦°à§à¦¬à¦¾à¦šà¦¨ à¦•à¦°à§à¦¨!');
-		}
-		else if(lunch_rate=="" || lunch_rate_bangla=="")
-		{
-			cogoToast.info('à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯ à¦¨à¦¿à¦°à§à¦§à¦¾à¦°à¦£ à¦•à¦°à§à¦¨!');
-		}
-		else if(dinner_rate=="" || dinner_rate_bangla=="")
-		{
-			cogoToast.info('à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯ à¦¨à¦¿à¦°à§à¦§à¦¾à¦°à¦£ à¦•à¦°à§à¦¨!');
-		}
-		else{
+		const errors = {};
+		if (!lunch_expiry_time) errors.lunch_expiry_time = 'Choose the lunch deadline.';
+		if (!dinner_expiry_time) errors.dinner_expiry_time = 'Choose the dinner deadline.';
+		if (!lunch_rate || !lunch_rate_bangla) errors.lunch_rate = 'Enter both lunch meal rates.';
+		if (!dinner_rate || !dinner_rate_bangla) errors.dinner_rate = 'Enter both dinner meal rates.';
+		this.setState({errors, formError: ''});
+		if (Object.keys(errors).length) return;
+			this.setState({submittingRate: true});
 			let myForm = new FormData();
 			myForm.append('id', meal_rate_id);
 			myForm.append('lunch_expiry_time', lunch_expiry_time);
@@ -102,28 +100,27 @@ class DailyMealItem extends React.Component{
 					this.handleClose();
 				}
 				else {
-					cogoToast.error('à¦¦à§à¦ƒà¦–à¦¿à¦¤! à¦†à¦¬à¦¾à¦° à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨');
+					this.setState({formError: 'The meal rates could not be updated.'});
 				}
+				this.setState({submittingRate: false});
 			})
 			.catch(err=>{
-				cogoToast.error('à¦¦à§à¦ƒà¦–à¦¿à¦¤! à¦†à¦¬à¦¾à¦° à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨');
+				const fieldErrors = getFieldErrors(err);
+				this.setState({
+					errors: fieldErrors,
+					formError: Object.keys(fieldErrors).length ? '' : getFormError(err),
+					submittingRate: false,
+				});
 			})
-		}
 	}   
 	onEditMealItem=()=>{
 		const {item_id, lunch_item, dinner_item} = this.state;
-		if(lunch_item == "")
-		{
-			cogoToast.error('à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§ à¦¨à¦¿à¦°à§à¦¬à¦¾à¦šà¦¨ à¦•à¦°à§à¦¨');
-		}
-
-	    else if(dinner_item == "")
-		{
-			cogoToast.error('à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§ à¦¨à¦¿à¦°à§à¦¬à¦¾à¦šà¦¨ à¦•à¦°à§à¦¨');
-
-		}
-
-		else {
+		const itemErrors = {};
+		if (!lunch_item.trim()) itemErrors.lunch_item = 'Enter the lunch menu.';
+		if (!dinner_item.trim()) itemErrors.dinner_item = 'Enter the dinner menu.';
+		this.setState({itemErrors, itemFormError: ''});
+		if (Object.keys(itemErrors).length) return;
+			this.setState({submittingItem: true});
 			let mealItem = new FormData();
 			mealItem.append('item_id', item_id);
 			mealItem.append('lunch_item', lunch_item);
@@ -137,24 +134,29 @@ class DailyMealItem extends React.Component{
 					this.handleItemClose();
 				}
 				else {
-					cogoToast.error('à¦¦à§à¦ƒà¦–à¦¿à¦¤! à¦†à¦¬à¦¾à¦° à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨');
+					this.setState({itemFormError: 'The meal menu could not be updated.'});
 				}
+				this.setState({submittingItem: false});
 			}).catch(err=>{
-				cogoToast.error('à¦¦à§à¦ƒà¦–à¦¿à¦¤! à¦†à¦¬à¦¾à¦° à¦šà§‡à¦·à§à¦Ÿà¦¾ à¦•à¦°à§à¦¨');
+				const fieldErrors = getFieldErrors(err);
+				this.setState({
+					itemErrors: fieldErrors,
+					itemFormError: Object.keys(fieldErrors).length ? '' : getFormError(err),
+					submittingItem: false,
+				});
 			})
-		}
 	}
 
 	handleClose=()=>{
-        this.setState({show:false});
+        this.setState({show:false, errors: {}, formError: '', submittingRate: false});
     }
 
     handleOpen=()=>{
-        this.setState({ show:true});
+        this.setState({show:true, errors: {}, formError: ''});
     }
 
     handleItemOpen=(item_id)=>{
-        this.setState({ showMeal:true, item_id});
+        this.setState({showMeal:true, item_id, itemErrors: {}, itemFormError: ''});
         Axios.get(API.DayWiseMealItemById + item_id)
         .then(res=>{
         	this.setState({
@@ -168,7 +170,7 @@ class DailyMealItem extends React.Component{
     }
 
     handleItemClose=()=>{
-        this.setState({ showMeal:false});
+        this.setState({showMeal:false, itemErrors: {}, itemFormError: '', submittingItem: false});
     }
 
    RedirectToLogin=()=>{
@@ -227,23 +229,28 @@ class DailyMealItem extends React.Component{
  					</div>
  			</div>
  		</SideBar>
- 		<Modal scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={show}>
+        <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={this.handleClose}>
                     <Modal.Header>
                         <strong><p className="text-danger">à¦®à¦¿à¦²à§‡à¦° à¦¸à¦®à§Ÿà¦¸à§€à¦®à¦¾ à¦à¦¬à¦‚ à¦®à§‚à¦²à§à¦¯ à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨ à¦•à¦°à§à¦¨</p></strong>
                     </Modal.Header>
                     <Modal.Body>
                         <label className="form-label"><b>à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦¶à§‡à¦· à¦¸à¦®à§Ÿà¦ƒ </b></label>
-                        <input value={lunch_expiry_time} onChange={(e)=>this.setState({lunch_expiry_time:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <input value={lunch_expiry_time} onChange={(e)=>this.setState({lunch_expiry_time:e.target.value, errors:{...this.state.errors,lunch_expiry_time:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.lunch_expiry_time ? 'is-invalid':''}`} type="time"/>
+                        {this.state.errors.lunch_expiry_time && <p className="field-error" role="alert">{this.state.errors.lunch_expiry_time}</p>}
                         <label className="form-label"><b>à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦¶à§‡à¦· à¦¸à¦®à§Ÿà¦ƒ</b></label>
-                        <input value={dinner_expiry_time} onChange={(e)=>this.setState({dinner_expiry_time:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <input value={dinner_expiry_time} onChange={(e)=>this.setState({dinner_expiry_time:e.target.value, errors:{...this.state.errors,dinner_expiry_time:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.dinner_expiry_time ? 'is-invalid':''}`} type="time"/>
+                        {this.state.errors.dinner_expiry_time && <p className="field-error" role="alert">{this.state.errors.dinner_expiry_time}</p>}
                          <label className="form-label"><b>à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯à¦ƒ</b></label>
-                        <input value={lunch_rate} onChange={(e)=>this.setState({lunch_rate:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <input value={lunch_rate} onChange={(e)=>this.setState({lunch_rate:e.target.value, errors:{...this.state.errors,lunch_rate:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.lunch_rate ? 'is-invalid':''}`} type="number" min="0"/><br/>
                         <label className="form-label"><b>à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯à¦ƒ (à¦¬à¦¾à¦‚à¦²à¦¾)</b></label>
-                        <input value={lunch_rate_bangla} onChange={(e)=>this.setState({lunch_rate_bangla:e.target.value})} className="form-control form-control-sm" type="text"/><br/>
+                        <input value={lunch_rate_bangla} onChange={(e)=>this.setState({lunch_rate_bangla:e.target.value, errors:{...this.state.errors,lunch_rate:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.lunch_rate ? 'is-invalid':''}`} type="text"/><br/>
                         <label className="form-label"><b>à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯à¦ƒ</b></label>
-                        <input value={dinner_rate} onChange={(e)=>this.setState({dinner_rate:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <input value={dinner_rate} onChange={(e)=>this.setState({dinner_rate:e.target.value, errors:{...this.state.errors,dinner_rate:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.dinner_rate ? 'is-invalid':''}`} type="number" min="0"/><br/>
                         <label className="form-label"><b>à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‚à¦²à§à¦¯à¦ƒ (à¦¬à¦¾à¦‚à¦²à¦¾)</b></label>
-                        <input value={dinner_rate_bangla} onChange={(e)=>this.setState({dinner_rate_bangla:e.target.value})} className="form-control form-control-sm" type="text"/><br/>
+                        <input value={dinner_rate_bangla} onChange={(e)=>this.setState({dinner_rate_bangla:e.target.value, errors:{...this.state.errors,dinner_rate:''}, formError:''})} className={`form-control form-control-sm ${this.state.errors.dinner_rate ? 'is-invalid':''}`} type="text"/><br/>
+                        {this.state.errors.lunch_rate && <p className="field-error" role="alert">{this.state.errors.lunch_rate}</p>}
+                        {this.state.errors.dinner_rate && <p className="field-error" role="alert">{this.state.errors.dinner_rate}</p>}
+                        {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
                     </Modal.Body>
                     <Modal.Footer>
                         <Button className="btn-sm btn-danger" onClick={this.handleClose}>
@@ -254,7 +261,7 @@ class DailyMealItem extends React.Component{
                         </button>
                     </Modal.Footer>
             </Modal>
-            <Modal scrollable={true} animation={false} className="animated zoomIn" show={showMeal} onHide={showMeal} backdrop="static">
+            <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={showMeal} onHide={this.handleItemClose} backdrop="static">
                     <Modal.Header>
                         <strong><p className="text-danger">à¦ªà§à¦°à¦¤à¦¿à¦¦à¦¿à¦¨à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§ à¦ªà¦°à¦¿à¦¬à¦°à§à¦¤à¦¨ à¦•à¦°à§à¦¨</p></strong>
                     </Modal.Header>
@@ -262,9 +269,12 @@ class DailyMealItem extends React.Component{
                         <label className="form-label"><b>à¦¬à¦¾à¦°à§‡à¦° à¦¨à¦¾à¦®à¦ƒ</b></label>
                         <input value={day} disabled className="form-control form-control-sm" type="text"/> <br/>
                         <label className="form-label"><b>à¦¦à§à¦ªà§à¦°à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§à¦¸à¦®à§‚à¦¹à¦ƒ</b></label>
-                        <textarea value={lunch_item} onChange={(e)=>this.setState({lunch_item:e.target.value})} className="form-control form-control-sm" type="text"/><br/>
+                        <textarea value={lunch_item} onChange={(e)=>this.setState({lunch_item:e.target.value, itemErrors:{...this.state.itemErrors,lunch_item:''}, itemFormError:''})} className={`form-control form-control-sm ${this.state.itemErrors.lunch_item ? 'is-invalid':''}`}/><br/>
+                        {this.state.itemErrors.lunch_item && <p className="field-error" role="alert">{this.state.itemErrors.lunch_item}</p>}
                          <label className="form-label"><b>à¦°à¦¾à¦¤à§‡à¦° à¦–à¦¾à¦¬à¦¾à¦°à§‡à¦° à¦®à§‡à¦¨à§à¦¯à§à¦¸à¦®à§‚à¦¹à¦ƒ</b></label>
-                        <textarea value={dinner_item} onChange={(e)=>this.setState({dinner_item:e.target.value})} className="form-control form-control-sm" type="text"/><br/> 
+                        <textarea value={dinner_item} onChange={(e)=>this.setState({dinner_item:e.target.value, itemErrors:{...this.state.itemErrors,dinner_item:''}, itemFormError:''})} className={`form-control form-control-sm ${this.state.itemErrors.dinner_item ? 'is-invalid':''}`}/><br/>
+                        {this.state.itemErrors.dinner_item && <p className="field-error" role="alert">{this.state.itemErrors.dinner_item}</p>}
+                        {this.state.itemFormError && <p className="field-error" role="alert">{this.state.itemFormError}</p>}
                         
                     </Modal.Body>
                     <Modal.Footer>

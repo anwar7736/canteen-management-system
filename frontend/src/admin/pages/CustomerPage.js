@@ -19,6 +19,7 @@ class CustomerPage extends Component {
             name : '',
             username : '',
             password : '',
+            token_no : '',
             email : '',
             phone : '',
             role : 'user',
@@ -63,6 +64,7 @@ class CustomerPage extends Component {
     resetForm=()=>{
         this.setState({
             name : '',
+            token_no : '',
             username : '',
             email : '',
             phone : '',
@@ -79,7 +81,7 @@ class CustomerPage extends Component {
 
 
     modalOpen=(action)=>{
-        this.setState({action});
+        this.setState({action, errors: {}, formError: ''});
         if(action==='Insert')
         {
             this.resetForm();
@@ -125,6 +127,7 @@ class CustomerPage extends Component {
 
 	modalClose=()=>{
 		this.setState({addNewModal: false});
+	    this.resetForm();
 	}
 
     onPhotoChange=(event)=>{
@@ -285,7 +288,7 @@ class CustomerPage extends Component {
                    
                     </div>
                 </SideBar>
-                <Modal scrollable={true} show={this.state.addNewModal} onHide={this.addNewModal}>
+                <Modal centered scrollable={true} show={this.state.addNewModal} onHide={this.modalClose}>
                         <Modal.Header>
                             <h5 className="text-danger">{this.state.headerTitle}</h5>
                             <a style={{textDecoration:'none', cursor:'pointer'}} title="Close" className="btn-lg" onClick={this.modalClose}>&times;</a>

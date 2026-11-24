@@ -112,7 +112,12 @@ class Payment extends React.Component{
     }
 
     handleOpen=()=>{
-        this.setState({ show:true});
+        this.clearForm();
+        this.setState({
+            show:true,
+            modalTitle: 'Make New Payment',
+            btnText: 'Save',
+        });
     }
 
     deleteIconOnClick=(id)=>{
@@ -337,7 +342,7 @@ class Payment extends React.Component{
                 <br/>
                 <br/>
             </SideBar>
-            <Modal scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={show}>
+            <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={this.handleClose}>
                     <Modal.Header>
                         <strong><p className="text-danger">{this.state.modalTitle}</p></strong>
                     </Modal.Header>

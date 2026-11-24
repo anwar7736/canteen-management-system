@@ -144,6 +144,7 @@ class OrderDailyMeal extends React.Component{
     }
 
     handleOpen=()=>{
+        this.resetForm();
         this.setState({ show:true});
     }
 
@@ -314,7 +315,7 @@ class OrderDailyMeal extends React.Component{
                                                 />
 
                 </div>
-                <Modal animation={false} className="animated zoomIn" show={show} onHide={show}>
+                <Modal centered scrollable={true} animation={false} className="animated zoomIn" show={show} onHide={this.handleClose}>
                     <Modal.Header>
                         <strong><p className="text-danger">{this.state.modalTitle}</p></strong>
                     </Modal.Header>
