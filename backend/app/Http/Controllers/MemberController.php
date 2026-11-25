@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\TenantMemberCapacity;
 use App\Mail\RegistrationMail;
 use App\Models\User;
+use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +15,10 @@ use Illuminate\Validation\Rule;
 
 class MemberController extends Controller
 {
+    public function __construct(private TenantMemberCapacity $memberCapacity)
+    {
+    }
+
     public function AllMembers()
     {
         return User::where('role', 'user')->orderBy('id')->get();
@@ -35,17 +42,27 @@ class MemberController extends Controller
             $tokenNo = random_int(111111, 999999);
         } while (User::where('token_no', $tokenNo)->exists());
 
-        $member = User::create([
-            'token_no' => $tokenNo,
-            'name' => $validated['name'],
-            'username' => $validated['username'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
-            'role' => $validated['role'],
-            'status' => $validated['status'],
-            'password' => Hash::make($validated['password']),
-            'address' => $validated['address'] ?? null,
-        ]);
+        $tenantId = app(TenantContext::class)->id();
+        if (!$tenantId) {
+            abort(400, 'A tenant context is required.');
+        }
+        $member = DB::transaction(function () use ($validated, $tokenNo, $tenantId) {
+            if ($validated['role'] === 'user') {
+                $this->memberCapacity->assertCanAddMember($tenantId);
+            }
+
+            return User::create([
+                'token_no' => $tokenNo,
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'role' => $validated['role'],
+                'status' => $validated['status'],
+                'password' => Hash::make($validated['password']),
+                'address' => $validated['address'] ?? null,
+            ]);
+        });
 
         if ($request->hasFile('photo')) {
             $member->photo = $this->storePhoto($request, $member);
@@ -103,26 +120,39 @@ class MemberController extends Controller
         }
 
         $member = User::findOrFail($id);
-        $member->fill([
-            'token_no' => $validated['token_no'],
-            'name' => $validated['name'],
-            'username' => $validated['username'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
-            'role' => $validated['role'],
-            'status' => $validated['status'],
-            'address' => $validated['address'] ?? null,
-        ]);
+        $promotingToMember = $member->role !== 'user' && $validated['role'] === 'user';
+        $updateMember = function () use ($member, $validated): void {
+            $member->fill([
+                'token_no' => $validated['token_no'],
+                'name' => $validated['name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'role' => $validated['role'],
+                'status' => $validated['status'],
+                'address' => $validated['address'] ?? null,
+            ]);
 
-        if (!empty($validated['password'])) {
-            $member->password = Hash::make($validated['password']);
+            if (!empty($validated['password'])) {
+                $member->password = Hash::make($validated['password']);
+            }
+
+            $member->save();
+        };
+
+        if ($promotingToMember) {
+            DB::transaction(function () use ($member, $updateMember) {
+                $this->memberCapacity->assertCanAddMember((int) $member->tenant_id);
+                $updateMember();
+            });
+        } else {
+            $updateMember();
         }
 
         if ($request->hasFile('photo')) {
             $member->photo = $this->storePhoto($request, $member);
+            $member->save();
         }
-
-        $member->save();
 
         return 1;
     }

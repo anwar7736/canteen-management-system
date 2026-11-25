@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\CreateTenantWorkspace;
+use App\Billing\TenantMemberCapacity;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPayment;
 use App\Models\Tenant;
@@ -143,7 +144,13 @@ class PlatformAdminController extends Controller
         $validated['password'] = Hash::make($validated['password']);
         unset($validated['password_confirmation']);
 
-        $user = User::create($validated);
+        $user = DB::transaction(function () use ($tenant, $validated) {
+            if ($validated['role'] === 'user') {
+                app(TenantMemberCapacity::class)->assertCanAddMember($tenant->getKey());
+            }
+
+            return User::create($validated);
+        });
 
         return response()->json([
             'data' => $user->only(['id', 'name', 'username', 'email', 'phone', 'token_no', 'role', 'status', 'address']),
@@ -170,7 +177,15 @@ class PlatformAdminController extends Controller
         } else {
             unset($validated['password']);
         }
-        $user->fill($validated)->save();
+        $promotingToMember = ($validated['role'] ?? $user->role) === 'user' && $user->role !== 'user';
+        if ($promotingToMember) {
+            DB::transaction(function () use ($tenant, $user, $validated) {
+                app(TenantMemberCapacity::class)->assertCanAddMember($tenant->getKey());
+                $user->fill($validated)->save();
+            });
+        } else {
+            $user->fill($validated)->save();
+        }
 
         return response()->json([
             'data' => $user->only(['id', 'name', 'username', 'email', 'phone', 'token_no', 'role', 'status', 'address']),

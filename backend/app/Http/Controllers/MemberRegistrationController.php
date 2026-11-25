@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\TenantMemberCapacity;
 use App\Mail\MemberSignupVerificationMail;
 use App\Models\MemberSignupVerification;
 use App\Models\Tenant;
@@ -171,6 +172,8 @@ class MemberRegistrationController extends Controller
             ) {
                 return false;
             }
+
+            app(TenantMemberCapacity::class)->assertCanAddMember($tenant->id);
 
             do {
                 $tokenNo = random_int(111111, 999999);
