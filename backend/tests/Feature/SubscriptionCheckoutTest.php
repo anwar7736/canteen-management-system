@@ -53,6 +53,7 @@ class SubscriptionCheckoutTest extends TestCase
             'tenant_id' => $tenant->id,
             'plan_id' => $plan->id,
             'status' => 'trialing',
+            'trial_ends_at' => now()->subDay(),
         ]);
         Sanctum::actingAs($admin, ['admin']);
 
@@ -90,6 +91,55 @@ class SubscriptionCheckoutTest extends TestCase
             'amount' => 1000,
             'status' => 'Pending',
         ]);
+    }
+
+    public function test_checkout_is_blocked_while_current_subscription_is_active(): void
+    {
+        $tenant = Tenant::create([
+            'name' => 'Active Subscription Canteen',
+            'slug' => 'active-subscription-canteen',
+            'status' => 'active',
+        ]);
+        $admin = User::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Active Subscription Admin',
+            'username' => 'active-subscription-admin',
+            'email' => 'active-subscription-admin@example.test',
+            'phone' => '01700000000',
+            'token_no' => 999002,
+            'role' => 'admin',
+            'status' => 'active',
+            'password' => Hash::make('test-password'),
+        ]);
+        $plan = SubscriptionPlan::create([
+            'name' => 'Active Pro',
+            'slug' => 'active-pro-test',
+            'price' => 1000,
+            'currency' => 'BDT',
+            'interval' => 'monthly',
+            'active' => true,
+        ]);
+        TenantSubscription::create([
+            'tenant_id' => $tenant->id,
+            'plan_id' => $plan->id,
+            'status' => 'active',
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addMonth(),
+        ]);
+        Sanctum::actingAs($admin, ['admin']);
+
+        $this->mock(SslCommerzNotification::class, function ($mock) {
+            $mock->shouldNotReceive('makePayment');
+        });
+
+        $this->withHeader('X-Tenant-Slug', $tenant->slug)
+            ->postJson('/api/tenant/subscription/checkout', ['plan_id' => $plan->id])
+            ->assertStatus(409)
+            ->assertJson([
+                'message' => 'Your current subscription is still active. You can make another payment after it expires.',
+            ]);
+
+        $this->assertDatabaseCount('subscription_payments', 0);
     }
 
     public function test_gateway_preserves_per_transaction_callbacks_and_legacy_defaults(): void

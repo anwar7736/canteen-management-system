@@ -93,8 +93,14 @@ class Billing extends Component {
     render() {
         const {plans, subscription, payments, pending, error, resultNotice} = this.state;
         const subscriptionStatus = subscription?.status || 'unconfigured';
-        const periodEnd = subscription?.current_period_end
-            ? new Date(subscription.current_period_end).toLocaleDateString()
+        const subscriptionEnd = subscriptionStatus === 'trialing'
+            ? subscription?.trial_ends_at || subscription?.current_period_end
+            : subscription?.current_period_end;
+        const subscriptionEndTime = subscriptionEnd ? new Date(subscriptionEnd).getTime() : Number.NaN;
+        const subscriptionIsRunning = ['active', 'trialing', 'canceled'].includes(subscriptionStatus)
+            && (!Number.isFinite(subscriptionEndTime) || subscriptionEndTime > Date.now());
+        const periodEnd = subscriptionEnd
+            ? new Date(subscriptionEnd).toLocaleDateString()
             : 'Not set';
 
         return (
@@ -128,11 +134,20 @@ class Billing extends Component {
                                         <button
                                             type="button"
                                             className="btn btn-success"
-                                            disabled={pending}
+                                            disabled={pending || subscriptionIsRunning}
                                             onClick={() => this.checkout(plan.id)}
                                         >
-                                            {pending ? 'Starting checkout…' : 'Choose plan'}
+                                            {pending
+                                                ? 'Starting checkout…'
+                                                : subscriptionIsRunning
+                                                    ? 'Current plan active'
+                                                    : 'Choose plan'}
                                         </button>
+                                        {subscriptionIsRunning && (
+                                            <p className="text-muted mt-2 mb-0">
+                                                You can make another payment after your current plan expires.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>

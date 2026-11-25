@@ -67,6 +67,20 @@ class SubscriptionController extends Controller
             abort(422, 'Choose a paid subscription plan.');
         }
 
+        $subscription = TenantSubscription::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->latest('id')
+            ->firstOrFail();
+        $subscriptionEnd = $subscription->status === 'trialing'
+            ? ($subscription->trial_ends_at ?? $subscription->current_period_end)
+            : $subscription->current_period_end;
+        if (
+            in_array($subscription->status, ['active', 'trialing', 'canceled'], true)
+            && (!$subscriptionEnd || $subscriptionEnd->isFuture())
+        ) {
+            abort(409, 'Your current subscription is still active. You can make another payment after it expires.');
+        }
+
         $storeId = config('sslcommerz.apiCredentials.store_id');
         $storePassword = config('sslcommerz.apiCredentials.store_password');
         if (!filled($storeId) || !filled($storePassword)) {
@@ -108,10 +122,6 @@ class SubscriptionController extends Controller
             'ipn_url' => PaymentUrls::backend('/subscription/ipn'),
         ];
 
-        $subscription = TenantSubscription::query()
-            ->where('tenant_id', $tenant->getKey())
-            ->latest('id')
-            ->firstOrFail();
         $payment = SubscriptionPayment::create([
             'tenant_id' => $tenant->getKey(),
             'subscription_id' => $subscription->getKey(),
