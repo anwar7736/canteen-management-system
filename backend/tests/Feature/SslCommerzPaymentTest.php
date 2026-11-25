@@ -144,6 +144,60 @@ class SslCommerzPaymentTest extends TestCase
         ], 'transaction-id', 25, 'BDT'));
     }
 
+    public function test_server_verified_callback_without_signature_is_accepted(): void
+    {
+        config([
+            'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
+            'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
+        ]);
+        $gateway = new class extends SslCommerzNotification {
+            public ?object $validationResponse = null;
+
+            protected function requestValidation(string $requestedUrl): ?object
+            {
+                return $this->validationResponse;
+            }
+        };
+        $gateway->validationResponse = (object) [
+            'status' => 'VALID',
+            'val_id' => 'validation-id',
+            'tran_id' => 'transaction-id',
+            'amount' => '25.00',
+            'currency_type' => 'BDT',
+        ];
+
+        $this->assertTrue($gateway->orderValidate([
+            'val_id' => 'validation-id',
+        ], 'transaction-id', 25, 'BDT'));
+    }
+
+    public function test_server_validation_must_match_callback_validation_id(): void
+    {
+        config([
+            'sslcommerz.apiCredentials.store_id' => 'sandbox-store',
+            'sslcommerz.apiCredentials.store_password' => 'sandbox-password',
+        ]);
+        $gateway = new class extends SslCommerzNotification {
+            public ?object $validationResponse = null;
+
+            protected function requestValidation(string $requestedUrl): ?object
+            {
+                return $this->validationResponse;
+            }
+        };
+        $gateway->validationResponse = (object) [
+            'status' => 'VALID',
+            'val_id' => 'different-validation-id',
+            'tran_id' => 'transaction-id',
+            'amount' => '25.00',
+            'currency_type' => 'BDT',
+        ];
+
+        $this->assertFalse($gateway->orderValidate([
+            'val_id' => 'validation-id',
+        ], 'transaction-id', 25, 'BDT'));
+    }
+
     public function test_success_callback_resolves_tenant_and_updates_statement_once(): void
     {
         $user = $this->createUser();

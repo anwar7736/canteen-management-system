@@ -53,12 +53,16 @@ class SslCommerzNotification extends AbstractSslCommerz
             return false;
         }
 
-        $post_data['store_id'] = $this->getStoreId();
-        $post_data['store_pass'] = $this->getStorePassword();
-        if (!$this->SSLCOMMERZ_hash_verify($post_data, $this->getStorePassword())) {
-            $this->error = 'Hash validation failed';
+        $hasSignature = array_key_exists('verify_sign', $post_data)
+            || array_key_exists('verify_key', $post_data);
+        if ($hasSignature) {
+            $post_data['store_id'] = $this->getStoreId();
+            $post_data['store_pass'] = $this->getStorePassword();
+            if (!$this->SSLCOMMERZ_hash_verify($post_data, $this->getStorePassword())) {
+                $this->error = 'Hash validation failed';
 
-            return false;
+                return false;
+            }
         }
 
         $apiDomain = rtrim((string) ($this->config['apiDomain'] ?? ''), '/');
@@ -74,32 +78,9 @@ class SslCommerzNotification extends AbstractSslCommerz
             return false;
         }
 
-        $handle = curl_init();
-        if ($handle === false) {
-            $this->error = 'Unable to connect to SSLCommerz';
-
-            return false;
-        }
-
-        curl_setopt($handle, CURLOPT_URL, $requestedUrl);
-        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($handle, CURLOPT_TIMEOUT, 30);
-        curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, true);
-        $response = curl_exec($handle);
-        $code = curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        $curlError = curl_errno($handle);
-        curl_close($handle);
-
-        if ($response === false || $code !== 200 || $curlError) {
-            $this->error = 'Unable to validate transaction with SSLCommerz';
-
-            return false;
-        }
-
-        $result = json_decode($response);
+        $result = $this->requestValidation($requestedUrl);
         if (!is_object($result)
-            || !isset($result->status, $result->tran_id, $result->amount, $result->currency_type)) {
+            || !isset($result->status, $result->val_id, $result->tran_id, $result->amount, $result->currency_type)) {
             $this->error = 'Invalid validation response from SSLCommerz';
 
             return false;
@@ -115,7 +96,8 @@ class SslCommerzNotification extends AbstractSslCommerz
         $verifiedAmount = $isBdt ? $result->amount : ($result->currency_amount ?? null);
         $verifiedCurrency = $isBdt ? 'BDT' : $result->currency_type;
 
-        if (!is_numeric($verifiedAmount)
+        if (!hash_equals((string) $post_data['val_id'], (string) $result->val_id)
+            || !is_numeric($verifiedAmount)
             || !hash_equals((string) $merchant_trans_id, (string) $result->tran_id)
             || abs(round((float) $merchant_trans_amount, 2) - round((float) $verifiedAmount, 2)) >= 0.01
             || $merchant_trans_currency !== $verifiedCurrency) {
@@ -125,6 +107,35 @@ class SslCommerzNotification extends AbstractSslCommerz
         }
 
         return true;
+    }
+
+    protected function requestValidation(string $requestedUrl): ?object
+    {
+        $handle = curl_init();
+        if ($handle === false) {
+            $this->error = 'Unable to connect to SSLCommerz';
+
+            return null;
+        }
+
+        curl_setopt($handle, CURLOPT_URL, $requestedUrl);
+        curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($handle, CURLOPT_TIMEOUT, 30);
+        curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, true);
+        $response = curl_exec($handle);
+        $code = curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        $curlError = curl_errno($handle);
+        curl_close($handle);
+
+        if ($response === false || $code !== 200 || $curlError) {
+            $this->error = 'Unable to validate transaction with SSLCommerz';
+
+            return null;
+        }
+
+        $result = json_decode($response);
+        return is_object($result) ? $result : null;
     }
 
     # FUNCTION TO CHECK HASH VALUE
