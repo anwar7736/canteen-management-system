@@ -2,31 +2,60 @@ import React, {Component, Fragment} from 'react';
 import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import API from '../api/api';
+import PaymentResultCard from '../../components/PaymentResultCard';
 
 function getPaymentResultNotice(result, payment, subscription) {
     const paymentStatus = String(payment?.status || '').toLowerCase();
 
     if (result === 'completed' || result === 'already_completed') {
         if (paymentStatus === 'complete' && subscription?.status === 'active') {
-            return {type: 'success', message: 'Payment successful. Your subscription is active.'};
+            return {
+                status: 'success',
+                title: 'Thank you! Your subscription is active',
+                message: 'Your payment was successful and your canteen subscription is ready to use.',
+            };
         }
         if (paymentStatus === 'pending') {
-            return {type: 'warning', message: 'Payment is still being verified. Your subscription has not been activated yet.'};
+            return {
+                status: 'pending',
+                title: 'Your payment is being verified',
+                message: 'Your subscription has not been activated yet. If you may have been charged, contact support before trying again.',
+            };
         }
-        return {type: 'warning', message: 'We could not confirm the payment. Check payment history before trying again.'};
+        return {
+            status: 'error',
+            title: 'We could not confirm this payment',
+            message: 'Check your payment history or contact support before trying again.',
+        };
     }
 
     if (result === 'failed' && paymentStatus === 'failed') {
-        return {type: 'danger', message: 'Payment failed. Your subscription has not changed.'};
+        return {
+            status: 'failed',
+            title: 'Payment was not completed',
+            message: 'Your subscription has not changed. You can return to billing and try again.',
+        };
     }
     if (result === 'canceled' && paymentStatus === 'canceled') {
-        return {type: 'info', message: 'Payment canceled. No subscription changes were made.'};
+        return {
+            status: 'canceled',
+            title: 'Payment canceled',
+            message: 'No subscription changes were made. Your current plan remains unchanged.',
+        };
     }
     if (result === 'validation_failed' || paymentStatus === 'pending') {
-        return {type: 'warning', message: 'SSLCommerz could not verify the payment yet. Your subscription is unchanged; if you were charged, contact support before retrying.'};
+        return {
+            status: 'pending',
+            title: 'We are checking your payment',
+            message: 'SSLCommerz has not verified the result yet. Your subscription is unchanged; contact support before retrying if you may have been charged.',
+        };
     }
     if (result) {
-        return {type: 'danger', message: 'We could not confirm this payment. Check payment history or contact support.'};
+        return {
+            status: 'error',
+            title: 'We could not confirm this payment',
+            message: 'Check your payment history or contact support before starting another payment.',
+        };
     }
 
     return null;
@@ -40,11 +69,13 @@ class Billing extends Component {
         pending: false,
         error: '',
         resultNotice: null,
+        resultLoading: false,
     };
 
     componentDidMount() {
         const result = new URLSearchParams(window.location.search).get('subscription');
         if (result) {
+            this.setState({resultLoading: true});
             const url = new URL(window.location.href);
             url.searchParams.delete('subscription');
             window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
@@ -65,10 +96,17 @@ class Billing extends Component {
                 subscription,
                 payments,
                 resultNotice: getPaymentResultNotice(result, payments[0], subscription),
+                resultLoading: false,
             });
         } catch (error) {
             this.setState({
                 error: error?.response?.data?.message || 'Unable to load subscription information.',
+                resultLoading: false,
+                resultNotice: result ? {
+                    status: 'error',
+                    title: 'We could not load your payment status',
+                    message: 'Your billing information is temporarily unavailable. If you may have been charged, contact support before trying again.',
+                } : null,
             });
         }
     };
@@ -91,7 +129,30 @@ class Billing extends Component {
     };
 
     render() {
-        const {plans, subscription, payments, pending, error, resultNotice} = this.state;
+        const {plans, subscription, payments, pending, error, resultNotice, resultLoading} = this.state;
+        if (resultLoading) {
+            return (
+                <SideBar title="Payment status">
+                    <PaymentResultCard
+                        status="pending"
+                        title="Checking your payment"
+                        message="Please wait while we confirm your subscription status."
+                    />
+                </SideBar>
+            );
+        }
+        if (resultNotice) {
+            return (
+                <SideBar title="Payment status">
+                    <PaymentResultCard
+                        {...resultNotice}
+                        actionLabel="Return to billing"
+                        onAction={() => this.setState({resultNotice: null, error: ''})}
+                    />
+                </SideBar>
+            );
+        }
+
         const subscriptionStatus = subscription?.status || 'unconfigured';
         const subscriptionEnd = subscriptionStatus === 'trialing'
             ? subscription?.trial_ends_at || subscription?.current_period_end
@@ -108,11 +169,6 @@ class Billing extends Component {
                 <div className="container-fluid animated zoomIn">
                     <h4 className="text-success text-center p-2 my-2">Subscription & Billing</h4>
                     {error && <div className="alert alert-danger">{error}</div>}
-                    {resultNotice && (
-                        <div className={`alert alert-${resultNotice.type}`} role="alert">
-                            {resultNotice.message}
-                        </div>
-                    )}
                     <div className="card mb-4">
                         <div className="card-body">
                             <h5 className="card-title">Current subscription</h5>

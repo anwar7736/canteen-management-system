@@ -4,6 +4,7 @@ import ResponsiveDataTable from './ResponsiveDataTable';
 import Axios from 'axios';
 import API from '../api/API';
 import cogoToast from '../utils/cogoToast';
+import PaymentResultCard from './PaymentResultCard';
 class PaymentSummary extends React.Component{
         state={
             dataTable : [],
@@ -12,12 +13,18 @@ class PaymentSummary extends React.Component{
             to_date   : '',
             callbackStatus: '',
             loadError: '',
+            paymentHistoryLoading: false,
         }
 
         componentDidMount=()=>{
          const token_no = localStorage.getItem('token_no');
              const callbackStatus = new URLSearchParams(window.location.search).get('payment') || '';
-             this.setState({token_no : token_no, callbackStatus});
+             this.setState({
+                 token_no,
+                 callbackStatus,
+                 loadError: '',
+                 paymentHistoryLoading: Boolean(callbackStatus),
+             });
              if (callbackStatus) {
                  const url = new URL(window.location.href);
                  url.searchParams.delete('payment');
@@ -26,13 +33,13 @@ class PaymentSummary extends React.Component{
 
          Axios.get(API.PaymentDetailsByUser + token_no)
          .then(response=>{
-             this.setState({dataTable : response.data});
+             this.setState({dataTable : response.data, paymentHistoryLoading: false});
 
          })
          .catch(error=>{
              const message = error?.response?.data?.message || 'Unable to load payment history.';
              console.error('Unable to load payment history:', error);
-             this.setState({loadError: message});
+             this.setState({loadError: message, paymentHistoryLoading: false});
              cogoToast.error(message);
          })
      }
@@ -66,37 +73,87 @@ class PaymentSummary extends React.Component{
          } 
 
        getPaymentNotice=()=>{
-            const {callbackStatus, dataTable} = this.state;
+            const {callbackStatus, dataTable, paymentHistoryLoading, loadError} = this.state;
+            if (!callbackStatus) return null;
+            if (paymentHistoryLoading) {
+                return {
+                    status: 'pending',
+                    title: 'Checking your payment',
+                    message: 'Please wait while we confirm your payment with the canteen.',
+                };
+            }
+            if (loadError) {
+                return {
+                    status: 'error',
+                    title: 'We could not load your payment status',
+                    message: 'Your payment history is temporarily unavailable. If you may have been charged, contact your canteen admin before trying again.',
+                };
+            }
             const latestStatus = String(dataTable[0]?.status || '').toLowerCase();
 
             if (callbackStatus === 'completed' || callbackStatus === 'already_completed') {
                 if (['processing', 'complete', 'completed', 'paid'].includes(latestStatus)) {
-                    return {type: 'success', message: 'Payment successful. Your payment has been added to your statement.'};
+                    return {
+                        status: 'success',
+                        title: 'Thank you! Your payment was successful',
+                        message: 'Your payment has been added to your statement. You can review it in your payment history.',
+                    };
                 }
                 if (latestStatus === 'pending') {
-                    return {type: 'warning', message: 'Payment is still being verified. Check your statement before retrying.'};
+                    return {
+                        status: 'pending',
+                        title: 'Your payment is still being verified',
+                        message: 'Please check your statement shortly. If you may have been charged, contact your canteen admin before trying again.',
+                    };
                 }
-                return {type: 'warning', message: 'We could not confirm the payment. Check your statement or contact your canteen admin.'};
+                return {
+                    status: 'error',
+                    title: 'We could not confirm this payment',
+                    message: 'Please check your statement or contact your canteen admin before making another payment.',
+                };
             }
             if (callbackStatus === 'failed' && latestStatus === 'failed') {
-                return {type: 'danger', message: 'Payment failed. No payment was added to your statement.'};
+                return {
+                    status: 'failed',
+                    title: 'Payment was not completed',
+                    message: 'No payment was added to your statement. You can try again when you are ready.',
+                    retryHref: '/make_payment',
+                };
             }
             if (callbackStatus === 'canceled' && latestStatus === 'canceled') {
-                return {type: 'info', message: 'Payment canceled. No payment was added to your statement.'};
+                return {
+                    status: 'canceled',
+                    title: 'Payment canceled',
+                    message: 'No payment was added to your statement. You can start a new payment whenever you are ready.',
+                    retryHref: '/make_payment',
+                };
             }
             if (callbackStatus === 'validation_failed' || latestStatus === 'pending') {
-                return {type: 'warning', message: 'SSLCommerz could not verify the payment yet. If you were charged, contact your canteen admin before retrying.'};
+                return {
+                    status: 'pending',
+                    title: 'We are checking your payment',
+                    message: 'SSLCommerz has not confirmed the result yet. If you may have been charged, contact your canteen admin before retrying.',
+                };
             }
-            if (callbackStatus) {
-                return {type: 'danger', message: 'We could not confirm this payment. Contact your canteen admin if you need help.'};
-            }
-
-            return null;
+            return {
+                status: 'error',
+                title: 'We could not confirm this payment',
+                message: 'Contact your canteen admin before making another payment.',
+            };
         }
 
  render(){
-    const {from_date, to_date, loadError} = this.state;
+    const {from_date, to_date, loadError, callbackStatus} = this.state;
     const paymentNotice = this.getPaymentNotice();
+    if (callbackStatus && paymentNotice) {
+        return (
+            <PaymentResultCard
+                {...paymentNotice}
+                actionLabel="View payment history"
+                onAction={() => this.setState({callbackStatus: ''})}
+            />
+        );
+    }
 
      const payments = [
             {
@@ -147,11 +204,6 @@ class PaymentSummary extends React.Component{
 
  	return(
  		<Fragment>
-              {paymentNotice && (
-                  <div className={`alert alert-${paymentNotice.type} mx-3`} role="alert">
-                      {paymentNotice.message}
-                  </div>
-              )}
               {loadError && <div className="alert alert-danger mx-3" role="alert">{loadError}</div>}
  			  <div className="container-fluid animated zoomIn transaction-preview">
                     <h3 className="heading-title text-danger text-center m-3">All Payment Details</h3><hr/>
