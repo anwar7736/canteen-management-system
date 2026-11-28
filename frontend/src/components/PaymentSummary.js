@@ -8,6 +8,7 @@ import PaymentResultCard from './PaymentResultCard';
 class PaymentSummary extends React.Component{
         state={
             dataTable : [],
+            allDataTable: [],
             token_no   : '',
             from_date : '',
             to_date   : '',
@@ -33,7 +34,7 @@ class PaymentSummary extends React.Component{
 
          Axios.get(API.PaymentDetailsByUser + token_no)
          .then(response=>{
-             this.setState({dataTable : response.data, paymentHistoryLoading: false});
+             this.setState({dataTable : response.data, allDataTable: response.data, paymentHistoryLoading: false});
 
          })
          .catch(error=>{
@@ -49,14 +50,23 @@ class PaymentSummary extends React.Component{
             this.componentDidMount();
         }
      
+      handleDateChange=(field, value)=>{
+           this.setState({[field]: value}, ()=>{
+               const {from_date, to_date} = this.state;
+               if (!from_date || !to_date) {
+                   this.setState({dataTable: this.state.allDataTable});
+                   return;
+               }
+               this.filterByDate();
+           });
+        }
+
       filterByDate=()=>{
            const {token_no, from_date, to_date} = this.state;
-
-           if(from_date=='' || to_date=='')
-           {
-             cogoToast.warn('Both dates are required!');
+           if (from_date > to_date) {
+               cogoToast.warn('The start date must be on or before the end date.');
+               return;
            }
-           else{
                 let myData = new FormData();
                 myData.append('token_no', token_no);
                 myData.append('from_date', from_date);
@@ -69,7 +79,6 @@ class PaymentSummary extends React.Component{
              .catch(error=>{
                 cogoToast.error('Something went wrong!');
              })
-           }
          } 
 
        getPaymentNotice=()=>{
@@ -207,11 +216,10 @@ class PaymentSummary extends React.Component{
               {loadError && <div className="alert alert-danger mx-3" role="alert">{loadError}</div>}
  			  <div className="container-fluid animated zoomIn transaction-preview">
                     <h3 className="heading-title text-danger text-center m-3">All Payment Details</h3><hr/>
-                    <div className="input-group">
-                        From : <input value={from_date} onChange={(e)=> {this.setState({from_date:e.target.value})}} className="w-25 form-control form-control-sm mx-2" type="date"/>
-                        To : <input value={to_date} onChange={(e)=> {this.setState({to_date:e.target.value})}} className="w-25 form-control form-control-sm mx-2" type="date"/>
-                        <button onClick={this.filterByDate} className="btn btn-sm btn-success mx-2">Filter</button>
-                        <button onClick={this.resetForm} className="btn btn-sm btn-danger mx-2">Refresh</button>
+                    <div className="report-date-filters">
+                        <label>From <input value={from_date} onChange={(e)=> this.handleDateChange('from_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                        <label>To <input value={to_date} onChange={(e)=> this.handleDateChange('to_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                        <button onClick={this.resetForm} className="btn btn-sm btn-outline-secondary">Reset dates</button>
                     </div>
                 </div>
                 <hr/>

@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\MonthlyStatement;
 use App\Tenancy\TenantContext;
+use Illuminate\Validation\ValidationException;
 
 class OrderMealController extends Controller
 {
@@ -20,6 +21,7 @@ class OrderMealController extends Controller
         $last_day = $now->copy()->endOfMonth()->toDateString();
 
         $meal_rate = MealRate::select('lunch_rate', 'dinner_rate')->first();
+        abort_unless($meal_rate, 503, 'Meal rates are not configured.');
         $order_summary = OrderMeal::where('token_no', $token_no)
             ->whereBetween('meal_given_date', [$first_day, $last_day])
             ->selectRaw(
@@ -80,19 +82,35 @@ class OrderMealController extends Controller
     }
     public function OrderDailyMeal(Request $req)
     {
-        $token_no        =  $req->token_no;
-        $lunch           =  (int)$req->lunch;
-        $dinner          =  (int)$req->dinner;
-        $parcel          =  $req->parcel;
-        $notes           =  $req->notes;
+        $validated = $req->validate([
+            'token_no' => ['required', 'string', 'max:50'],
+            'lunch' => ['required', 'integer', 'min:0', 'max:5'],
+            'dinner' => ['required', 'integer', 'min:0', 'max:5'],
+            'parcel' => ['required', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+        if ((int) $validated['lunch'] === 0 && (int) $validated['dinner'] === 0) {
+            throw ValidationException::withMessages([
+                'meal' => 'Choose at least one meal quantity.',
+            ]);
+        }
+
+        $actor = $req->user();
+        $token_no = $actor->role === 'user' ? (string) $actor->token_no : $validated['token_no'];
+        $lunch = (int) $validated['lunch'];
+        $dinner = (int) $validated['dinner'];
+        $parcel = (bool) $validated['parcel'];
+        $notes = $validated['notes'] ?? null;
         $total_meal      =  $lunch + $dinner;
         
         $user = User::where('token_no', $token_no)->first();
-        $user_id = $user->id;
+        abort_unless($user, 404, 'The selected member could not be found.');
+        $user_id = $user->getKey();
 
         $meal_given_date = now('Asia/Dhaka')->addDay()->toDateString();
 
         $meal_rates    =  MealRate::first();
+        abort_unless($meal_rates, 503, 'Meal rates are not configured.');
         $lunch_rate    =  $meal_rates->lunch_rate;
         $dinner_rate   =  $meal_rates->dinner_rate;
         $lunch_amount  =  $lunch_rate * $lunch ;
@@ -104,13 +122,9 @@ class OrderMealController extends Controller
                         'token_no'=>$token_no, 
                         'meal_given_date'=> $meal_given_date
                         ])->first();
-        if($order_count)
-        {
-            return 0;
-            
-
-        }
-        else {
+        if ($order_count) {
+            return response()->json(['message' => "Today's order has already been placed."], 409);
+        } else {
             $order = new OrderMeal;
             $order->user_id = $user_id;
             $order->token_no = $token_no;
@@ -224,21 +238,41 @@ class OrderMealController extends Controller
 
     public function ChangeOrderedMeal(Request $req)
     {
-        $order_id      =  $req->order_id;
-        $token_no      =  $req->token_no;
-        $lunch         =  (int)$req->lunch;
-        $dinner        =  (int)$req->dinner;
-        $parcel        =  $req->parcel;
+        $validated = $req->validate([
+            'order_id' => ['required', 'integer'],
+            'token_no' => ['required', 'string', 'max:50'],
+            'lunch' => ['required', 'integer', 'min:0', 'max:5'],
+            'dinner' => ['required', 'integer', 'min:0', 'max:5'],
+            'parcel' => ['required', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+        if ((int) $validated['lunch'] === 0 && (int) $validated['dinner'] === 0) {
+            throw ValidationException::withMessages([
+                'meal' => 'Choose at least one meal quantity.',
+            ]);
+        }
+        $order_id = $validated['order_id'];
+        $lunch = (int) $validated['lunch'];
+        $dinner = (int) $validated['dinner'];
+        $parcel = (bool) $validated['parcel'];
         $total_meal    =  $lunch + $dinner;
-        $notes         =  $req->notes;
+        $notes         =  $validated['notes'] ?? null;
         $meal_rates    =  MealRate::first();
+        abort_unless($meal_rates, 503, 'Meal rates are not configured.');
         $lunch_rate    =  $meal_rates->lunch_rate;
         $dinner_rate   =  $meal_rates->dinner_rate;
         $lunch_amount  =  $lunch_rate * $lunch ;
         $dinner_amount =  $dinner_rate * $dinner;
         $total_amount  =  $lunch_amount + $dinner_amount;
         
-        $ordered_meal  =  OrderMeal::find($order_id);
+        $ordered_meal = OrderMeal::whereKey($order_id)
+            ->whereDate('meal_given_date', now('Asia/Dhaka')->addDay()->toDateString())
+            ->firstOrFail();
+        $actor = $req->user();
+        if ($actor->role === 'user') {
+            abort_unless((int) $ordered_meal->user_id === (int) $actor->getKey(), 403);
+        }
+        $token_no = (string) $ordered_meal->token_no;
         $ordered_meal->lunch  = $lunch;
         $ordered_meal->lunch_amount = $lunch_amount;
         $ordered_meal->dinner = $dinner;

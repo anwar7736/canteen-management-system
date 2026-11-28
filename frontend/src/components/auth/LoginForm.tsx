@@ -10,8 +10,8 @@ import PasswordField from '../PasswordField';
 import Select2Field from '../Select2Field';
 
 type LoginRole = 'user' | 'admin';
-type LoginErrors = Partial<Record<'username' | 'password', string>>;
-type TenantOption = { name: string; slug: string };
+type LoginErrors = Partial<Record<'username' | 'password' | 'otp', string>>;
+type TenantOption = { name: string; slug: string; two_factor_enabled?: boolean };
 
 function responseMessage(result: unknown, fallback: string) {
   return result && typeof result === 'object' && 'message' in result && typeof result.message === 'string'
@@ -35,7 +35,11 @@ function parseTenantOptions(result: unknown): TenantOption[] {
     ) {
       throw new Error('The canteen list response was invalid.');
     }
-    return { name: tenant.name, slug: tenant.slug };
+    return {
+      name: tenant.name,
+      slug: tenant.slug,
+      two_factor_enabled: 'two_factor_enabled' in tenant && tenant.two_factor_enabled === true,
+    };
   });
 }
 
@@ -55,13 +59,15 @@ export default function LoginForm({ role }: { role: LoginRole }) {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [rememberUsername, setRememberUsername] = useState(role === 'user');
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [authError, setAuthError] = useState('');
   const [tenantOptions, setTenantOptions] = useState<TenantOption[]>([]);
   const [selectedTenantSlug, setSelectedTenantSlug] = useState('');
-  const [loginStep, setLoginStep] = useState<'credentials' | 'tenant'>('credentials');
+  const [loginStep, setLoginStep] = useState<'credentials' | 'tenant' | 'otp'>('credentials');
+  const [requiresOtp, setRequiresOtp] = useState(false);
 
   const isAdmin = role === 'admin';
 
@@ -82,19 +88,22 @@ export default function LoginForm({ role }: { role: LoginRole }) {
     }
   }, [role]);
 
-  async function signInToTenant(tenantSlug: string) {
+  async function signInToTenant(tenantSlug: string, oneTimeCode?: string) {
     const result = await signIn('credentials', {
       redirect: false,
       role,
       tenantSlug,
       username: username.trim(),
       password,
+      ...(oneTimeCode ? { otp: oneTimeCode } : {}),
     });
 
     if (!result?.ok) {
       setAuthError(
         result?.error === 'CredentialsSignin'
-          ? 'Username/email or password is incorrect, or the account is inactive.'
+          ? requiresOtp
+            ? 'The authenticator code is incorrect or expired.'
+            : 'Username/email or password is incorrect, or the account is inactive.'
           : 'Unable to sign in. Please try again.'
       );
       return;
@@ -146,11 +155,37 @@ export default function LoginForm({ role }: { role: LoginRole }) {
 
       setPending(true);
       try {
-        await signInToTenant(selectedTenantSlug);
+        const selectedTenant = tenantOptions.find((tenant) => tenant.slug === selectedTenantSlug);
+        if (selectedTenant?.two_factor_enabled) {
+          setRequiresOtp(true);
+          setOtp('');
+          setLoginStep('otp');
+        } else {
+          setRequiresOtp(false);
+          await signInToTenant(selectedTenantSlug);
+        }
       } catch (error) {
         console.error(`${isAdmin ? 'Admin' : 'User'} sign-in failed:`, error);
         setAuthError('Something went wrong. Please try again.');
         toast.error('Unable to sign in. Please try again.');
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
+
+    if (loginStep === 'otp') {
+      if (!/^\d{6}$/.test(otp)) {
+        setErrors({ otp: 'Enter the 6-digit code from your authenticator app.' });
+        return;
+      }
+
+      setPending(true);
+      try {
+        await signInToTenant(selectedTenantSlug, otp);
+      } catch (error) {
+        console.error(`${isAdmin ? 'Admin' : 'User'} sign-in failed:`, error);
+        setAuthError('Unable to verify your authenticator code. Please try again.');
       } finally {
         setPending(false);
       }
@@ -192,7 +227,15 @@ export default function LoginForm({ role }: { role: LoginRole }) {
         return;
       }
 
-      await signInToTenant(options[0].slug);
+      if (options[0].two_factor_enabled) {
+        setSelectedTenantSlug(options[0].slug);
+        setRequiresOtp(true);
+        setOtp('');
+        setLoginStep('otp');
+      } else {
+        setRequiresOtp(false);
+        await signInToTenant(options[0].slug);
+      }
     } catch (error) {
       console.error(`${isAdmin ? 'Admin' : 'User'} sign-in failed:`, error);
       setAuthError('Unable to verify your credentials. Please try again.');
@@ -211,6 +254,8 @@ export default function LoginForm({ role }: { role: LoginRole }) {
         <p className="auth-description">
           {loginStep === 'tenant'
             ? 'Your credentials match multiple canteens. Choose where you want to sign in.'
+            : loginStep === 'otp'
+              ? 'Enter the current 6-digit code from your authenticator app.'
             : isAdmin
               ? 'Sign in to manage your canteen.'
               : 'Sign in to continue to your canteen account.'}
@@ -236,6 +281,25 @@ export default function LoginForm({ role }: { role: LoginRole }) {
                   <option key={tenant.slug} value={tenant.slug}>{tenant.name}</option>
                 ))}
               </Select2Field>
+            </div>
+          ) : loginStep === 'otp' ? (
+            <div className="auth-field">
+              <label htmlFor={`${role}-otp`}>Authenticator code</label>
+              <input
+                id={`${role}-otp`}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+                className={`form-control${errors.otp ? ' is-invalid' : ''}`}
+                value={otp}
+                onChange={(event) => {
+                  setOtp(event.target.value.replace(/\D/g, '').slice(0, 6));
+                  setErrors((current) => ({ ...current, otp: undefined }));
+                }}
+                aria-invalid={Boolean(errors.otp)}
+                aria-describedby={errors.otp ? `${role}-otp-error` : undefined}
+              />
+              {errors.otp && <p className="field-error" id={`${role}-otp-error`} role="alert">{errors.otp}</p>}
             </div>
           ) : (
             <>
@@ -305,6 +369,25 @@ export default function LoginForm({ role }: { role: LoginRole }) {
                   setLoginStep('credentials');
                   setSelectedTenantSlug('');
                   setTenantOptions([]);
+                  setAuthError('');
+                }}
+                disabled={pending}
+              >
+                Back
+              </button>
+            </>
+          )}
+          {loginStep === 'otp' && (
+            <>
+              <button className="btn btn-success auth-submit" type="submit" disabled={pending || otp.length !== 6}>
+                {pending ? 'Verifying…' : 'Verify and sign in'}
+              </button>
+              <button
+                className="btn btn-outline-secondary mt-2 w-full"
+                type="button"
+                onClick={() => {
+                  setLoginStep(tenantOptions.length > 1 ? 'tenant' : 'credentials');
+                  setOtp('');
                   setAuthError('');
                 }}
                 disabled={pending}

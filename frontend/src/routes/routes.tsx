@@ -16,6 +16,7 @@ import PaymentPage from '../legacy-pages/PaymentPage';
 import PaymentSummaryPage from '../legacy-pages/PaymentSummaryPage';
 import MyTokenPage from '../legacy-pages/MyTokenPage';
 import MonthlyReportPage from '../legacy-pages/MonthlyReportPage';
+import SecurityPage from '../legacy-pages/SecurityPage';
 import AdminPanel from '../admin/AdminPanel';
 
 
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/otp_verification" element={<OTPVerify />} />
       <Route path="/reset_password" element={<ForgetPassword />} />
       <Route path="/change_password" element={<ChangePassword />} />
+      <Route path="/security" element={<SecurityPage />} />
       <Route path="/user_profile" element={<ProfilePage />} />
       <Route path="/dailyMealItem" element={<DailyMealItemPage />} />
       <Route path="/send_message" element={<SendMessagePage />} />

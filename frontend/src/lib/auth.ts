@@ -50,7 +50,7 @@ async function authorizeLogin(credentials: Record<string, string>): Promise<Logi
       response = await fetch(`${API_BACKEND_URL}login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug! },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, ...(credentials.otp ? { otp: credentials.otp } : {}) }),
         cache: 'no-store',
       });
     }
@@ -120,6 +120,7 @@ export const authOptions: NextAuthOptions = {
         role: { label: 'Account type', type: 'text' },
         username: { label: 'Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
+        otp: { label: 'Authenticator code', type: 'text' },
       },
       authorize: authorizeLogin,
     }),

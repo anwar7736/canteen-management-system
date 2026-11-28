@@ -2,14 +2,12 @@ import React, {Component, Fragment} from 'react';
 import {Button, Card, Col, Container, Form, Row} from "react-bootstrap";
 import {Link} from 'react-router-dom';
 import API from '../api/API';
-import {Navigate} from 'react-router-dom';
 import cogoToast from '../utils/cogoToast';
 import Axios from 'axios';
 import {getFieldErrors, getFormError} from '../utils/formValidation';
 
 class Profile extends Component {
        state = {
-            PageRefreshStatus : false,
             name : '',
             username : '',
             email : '',
@@ -38,12 +36,11 @@ class Profile extends Component {
             }
         })
         .catch(error=>{
-
+            this.setState({formError: getFormError(error)});
         })
      }
     onUpdateProfile=(e)=>{
      e.preventDefault();
-      let id = localStorage.getItem('id');
       let name = this.state.name;
       let username = this.state.username;
       let email = this.state.email;
@@ -64,26 +61,37 @@ class Profile extends Component {
       this.setState({errors, formError: ''});
       if (Object.keys(errors).length) return;
 
-            this.setState({updateBtn: 'Updating...'});
+            this.setState({updateBtn: 'Updating...', isDisabled: true});
             let MyForm = new FormData();
-            MyForm.append('id', id);
             MyForm.append('name', name);
             MyForm.append('username', username);
             MyForm.append('email', email);
             MyForm.append('phone', phone);
-            MyForm.append('photo', photo);
+            if (photo) MyForm.append('photo', photo);
             MyForm.append('address', address);
 
             Axios.post(API.UpdateProfile, MyForm)
             .then(response=>{                
                 if(typeof response.data === 'string')
                 {
-                    this.setState({updateBtn: 'Update Profile', formError: response.data});
+                    this.setState({updateBtn: 'Update Profile', isDisabled: false, formError: response.data});
                 }
 
                 else if(response.status==200 && response.data!=0)
                 {
-                    this.setState({PageRefreshStatus:true, updateBtn: 'Update Profile'})
+                    this.setState({
+                        name: response.data.name,
+                        username: response.data.username,
+                        email: response.data.email,
+                        phone: response.data.phone,
+                        previewImg: response.data.photo,
+                        address: response.data.address,
+                        photo: '',
+                        updateBtn: 'Update Profile',
+                        isDisabled: false,
+                        errors: {},
+                        formError: '',
+                    });
                     cogoToast.success('Your profile updated successfully..');
                     // localStorage.removeItem('name');
                     // localStorage.removeItem('username');
@@ -96,26 +104,19 @@ class Profile extends Component {
 	                localStorage.setItem('photo', response.data['photo']);
                 }
                 else{
-                    this.setState({updateBtn: 'Update Profile', formError: 'There are no profile changes to save.'});
+                    this.setState({updateBtn: 'Update Profile', isDisabled: false, formError: 'There are no profile changes to save.'});
                 }
             })
             .catch(error=>{
                 const fieldErrors = getFieldErrors(error);
                 this.setState({
                     updateBtn: 'Update Profile',
+                    isDisabled: false,
                     errors: fieldErrors,
                     formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
                 });
             })
 }
-    PageRefresh=()=>{
-        if(this.state.PageRefreshStatus===true){
-            let path = window.location.pathname;
-            return (
-                    <Navigate to={path} />
-                   );
-        }
-    }
     render() {
         return (
             <Fragment>
@@ -151,7 +152,7 @@ class Profile extends Component {
                                     {this.state.name ? this.state.name.trim().charAt(0).toUpperCase() : 'M'}
                                 </div>
                             )}
-                            <Form.Control onChange={(e)=> this.setState({photo:e.target.files[0], errors: {...this.state.errors, photo: ''}, formError: ''})} isInvalid={Boolean(this.state.errors.photo)} aria-invalid={Boolean(this.state.errors.photo)} type="file" placeholder="Re-type new password" />
+                            <Form.Control onChange={(e)=> this.setState({photo:e.target.files[0] || '', errors: {...this.state.errors, photo: ''}, formError: ''})} isInvalid={Boolean(this.state.errors.photo)} aria-invalid={Boolean(this.state.errors.photo)} type="file" />
                             {this.state.errors.photo && <Form.Control.Feedback type="invalid">{this.state.errors.photo}</Form.Control.Feedback>}
                           </Form.Group>
                           <Form.Group controlId="formPassword">
@@ -168,7 +169,6 @@ class Profile extends Component {
                             </Link>
                         </Form>
                     </div>
-                {this.PageRefresh()}
             </Fragment>
         );
     }

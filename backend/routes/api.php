@@ -21,6 +21,7 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SslCommerzPaymentController;
 use App\Http\Controllers\TenantRegistrationController;
 use App\Http\Controllers\TenantSignupVerificationController;
+use App\Http\Controllers\TwoFactorAuthenticationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -102,6 +103,15 @@ Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:u
     Route::post('/UpdateProfile', [ProfileController::class, 'UpdateProfile']);
 });
 
+Route::middleware(['auth:sanctum', 'tenant.member', 'role:user'])
+    ->prefix('user/security/two-factor')
+    ->group(function () {
+        Route::get('/', [TwoFactorAuthenticationController::class, 'status']);
+        Route::post('/setup', [TwoFactorAuthenticationController::class, 'setup'])->middleware('throttle:5,1');
+        Route::post('/confirm', [TwoFactorAuthenticationController::class, 'confirm'])->middleware('throttle:10,1');
+        Route::post('/disable', [TwoFactorAuthenticationController::class, 'disable'])->middleware('throttle:10,1');
+    });
+
 Route::middleware(['auth:sanctum', 'tenant.member', 'owned.api'])->group(function () {
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()?->delete();
@@ -110,8 +120,8 @@ Route::middleware(['auth:sanctum', 'tenant.member', 'owned.api'])->group(functio
     });
     Route::post('/ChangePassword', [PasswordController::class, 'ChangePassword']);
     Route::get('/GetUserProfile/{id}', [ProfileController::class, 'GetUserProfile']);
-    Route::post('/OrderDailyMeal', [OrderMealController::class, 'OrderDailyMeal']);
-    Route::post('/ChangeOrderedMeal', [OrderMealController::class, 'ChangeOrderedMeal']);
+    Route::post('/AdminOrderDailyMeal', [OrderMealController::class, 'OrderDailyMeal']);
+    Route::post('/AdminChangeOrderedMeal', [OrderMealController::class, 'ChangeOrderedMeal']);
     Route::get('/DeleteTodayOrderedMeal/{order_id}', [OrderMealController::class, 'DeleteTodayOrderedMeal']);
     Route::get('/RestoreTodayOrderedMeal/{order_id}', [OrderMealController::class, 'RestoreTodayOrderedMeal']);
     Route::get('/GetMealByOrderId/{order_id}', [DayWiseMealController::class, 'GetMealByOrderId']);
@@ -160,6 +170,8 @@ Route::middleware(['auth:sanctum', 'tenant.member', 'tenant.subscribed', 'role:a
 
     Route::get('/GetTodayAllOrderInfo', [OrderMealController::class, 'GetTodayAllOrderInfo']);
     Route::get('/GetTodayOrderInfoByOrderId/{order_id}', [OrderMealController::class, 'GetTodayOrderInfoByOrderId']);
+    Route::post('/OrderDailyMeal', [OrderMealController::class, 'OrderDailyMeal']);
+    Route::post('/ChangeOrderedMeal', [OrderMealController::class, 'ChangeOrderedMeal']);
     Route::post('/ChangeMealStatus', [OrderMealController::class, 'ChangeMealStatus']);
 
     Route::get('/GetAllMealDetails', [DayWiseMealController::class, 'GetAllMealDetails']);

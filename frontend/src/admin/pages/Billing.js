@@ -3,6 +3,7 @@ import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import API from '../api/api';
 import PaymentResultCard from '../../components/PaymentResultCard';
+import ResponsiveDataTable from '../../components/ResponsiveDataTable';
 
 function getPaymentResultNotice(result, payment, subscription) {
     const paymentStatus = String(payment?.status || '').toLowerCase();
@@ -163,6 +164,12 @@ class Billing extends Component {
         const periodEnd = subscriptionEnd
             ? new Date(subscriptionEnd).toLocaleDateString()
             : 'Not set';
+        const paymentColumns = [
+            {name: 'Transaction', selector: row => row.transaction_id, sortable: true},
+            {name: 'Amount', selector: row => `${row.currency} ${Number(row.amount).toLocaleString()}`, sortable: true},
+            {name: 'Status', selector: row => row.status, sortable: true},
+            {name: 'Date', selector: row => new Date(row.created_at).toLocaleString(), sortable: true},
+        ];
 
         return (
             <SideBar title="Subscription & Billing">
@@ -215,23 +222,12 @@ class Billing extends Component {
                             {payments.length === 0 ? (
                                 <p className="text-muted mb-0">No subscription payments yet.</p>
                             ) : (
-                                <div className="table-responsive">
-                                    <table className="table responsive-card-table">
-                                        <thead>
-                                            <tr><th>Transaction</th><th>Amount</th><th>Status</th><th>Date</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            {payments.map((payment) => (
-                                                <tr key={payment.id}>
-                                                    <td data-label="Transaction">{payment.transaction_id}</td>
-                                                    <td data-label="Amount">{payment.currency} {Number(payment.amount).toLocaleString()}</td>
-                                                    <td data-label="Status">{payment.status}</td>
-                                                    <td data-label="Date">{new Date(payment.created_at).toLocaleString()}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <ResponsiveDataTable
+                                    columns={paymentColumns}
+                                    data={payments}
+                                    keyField="id"
+                                    paginationPerPage={5}
+                                />
                             )}
                         </div>
                     </div>

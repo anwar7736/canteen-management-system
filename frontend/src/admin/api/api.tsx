@@ -19,11 +19,11 @@ class api {
 	static ChangeMealRate   = this.baseURL + "ChangeMealRate";
 	static DayWiseMealItemById   = this.baseURL + "DayWiseMealItemById/";
 	static EditDayWiseMealItem   = this.baseURL + "EditDayWiseMealItem";
-    static OrderDailyMeal  = this.baseURL + "OrderDailyMeal";
+    static OrderDailyMeal  = this.baseURL + "AdminOrderDailyMeal";
 	static GetTodayAllOrderInfo  = this.baseURL + "GetTodayAllOrderInfo";
 	static GetTodayOrderInfoByOrderId  = this.baseURL + "GetTodayOrderInfoByOrderId/";
 	static GetMealByOrderId  = this.baseURL + "GetMealByOrderId/";
-	static ChangeOrderedMeal  = this.baseURL + "ChangeOrderedMeal";
+	static ChangeOrderedMeal  = this.baseURL + "AdminChangeOrderedMeal";
 	static DeleteTodayOrder  = this.baseURL + "DeleteTodayOrderedMeal/";
 	static RestoreTodayOrder  = this.baseURL + "RestoreTodayOrderedMeal/";
 	static SendMessage   = this.baseURL + "SendMessage";

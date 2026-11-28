@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import confirmAction from '../../utils/confirmAction';
+import ResponsiveDataTable from '../ResponsiveDataTable';
 
 type Plan = { id: number; name: string; active: boolean; price: string | number; currency: string };
 type Tenant = {
@@ -546,6 +547,44 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
     );
   }
 
+  const userColumns = [
+    { name: 'Name', selector: (user: UserRecord) => user.name, sortable: true },
+    { name: 'Email', selector: (user: UserRecord) => user.email, sortable: true },
+    { name: 'Username / token', selector: (user: UserRecord) => `${user.username} / ${user.token_no}`, sortable: true },
+    { name: 'Contact', selector: (user: UserRecord) => user.phone, sortable: true },
+    { name: 'Role', selector: (user: UserRecord) => user.role, sortable: true },
+    { name: 'Status', selector: (user: UserRecord) => user.status, sortable: true },
+    {
+      name: 'Actions',
+      selector: (user: UserRecord) => user.id,
+      sortable: false,
+      exportable: false,
+      cell: (user: UserRecord) => (
+        <div className="flex max-w-md flex-wrap gap-2">
+          <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold" type="button" onClick={() => openEditUser(user)}>Edit</button>
+          <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => changeUserStatus(user)} disabled={actionUserId === user.id}>
+            {user.status === 'active' ? 'Suspend' : 'Reactivate'}
+          </button>
+          <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => sendPasswordReset(user)} disabled={actionUserId === user.id}>Reset password</button>
+          <button className="rounded-lg border border-amber-800 px-2.5 py-1.5 font-bold text-amber-700 disabled:opacity-50" type="button" onClick={() => impersonate(user)} disabled={actionUserId === user.id || user.status !== 'active' || tenant.status !== 'active'}>Impersonate</button>
+          <button className="rounded-lg border border-red-800 px-2.5 py-1.5 font-bold text-red-700 disabled:opacity-50" type="button" onClick={() => deleteUser(user)} disabled={actionUserId === user.id}>Delete</button>
+        </div>
+      ),
+    },
+  ];
+  const auditRows = audits.data.map((audit) => ({
+    ...audit,
+    status: audit.ended_at ? 'Ended' : new Date(audit.expires_at).getTime() <= Date.now() ? 'Expired' : 'Active',
+  }));
+  const auditColumns = [
+    { name: 'Started', selector: (audit: ImpersonationAudit) => new Date(audit.started_at).toLocaleString(), sortable: true },
+    { name: 'Platform admin', selector: (audit: ImpersonationAudit) => audit.platform_admin_username, sortable: true },
+    { name: 'Impersonated user', selector: (audit: ImpersonationAudit) => audit.target_username, sortable: true },
+    { name: 'Reason', selector: (audit: ImpersonationAudit) => audit.reason, sortable: true },
+    { name: 'Expires', selector: (audit: ImpersonationAudit) => new Date(audit.expires_at).toLocaleString(), sortable: true },
+    { name: 'Status', selector: (audit: typeof auditRows[number]) => audit.status, sortable: true },
+  ];
+
   return (
     <section className="platform-page">
       <div>
@@ -635,52 +674,9 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="mobile-card-table text-left">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Username / token</th>
-                  <th>Contact</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersLoading ? (
-                  <tr><td className="py-5 text-slate-400" colSpan={6}>Loading tenant users…</td></tr>
-                ) : users.data.length === 0 ? (
-                  <tr><td className="py-5 text-slate-400" colSpan={6}>No tenant users found.</td></tr>
-                ) : users.data.map((user) => (
-                  <tr key={user.id} className="border-t border-slate-800 align-top">
-                    <td data-label="Name">
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-xs text-slate-400">{user.email}</div>
-                    </td>
-                    <td data-label="Username / token">
-                      <div>{user.username}</div>
-                      <div className="text-xs text-slate-400">Token {user.token_no}</div>
-                    </td>
-                    <td data-label="Contact">{user.phone}</td>
-                    <td data-label="Role" className="capitalize">{user.role}</td>
-                    <td data-label="Status"><span className={`platform-chip ${user.status === 'active' ? '' : 'is-warning'}`}>{user.status}</span></td>
-                    <td data-label="Actions">
-                      <div className="flex max-w-md flex-wrap gap-2">
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold" type="button" onClick={() => openEditUser(user)}>Edit</button>
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => changeUserStatus(user)} disabled={actionUserId === user.id}>
-                          {user.status === 'active' ? 'Suspend' : 'Reactivate'}
-                        </button>
-                        <button className="rounded-lg border border-slate-700 px-2.5 py-1.5 font-bold disabled:opacity-50" type="button" onClick={() => sendPasswordReset(user)} disabled={actionUserId === user.id}>Reset password</button>
-                        <button className="rounded-lg border border-amber-800 px-2.5 py-1.5 font-bold text-amber-700 disabled:opacity-50" type="button" onClick={() => impersonate(user)} disabled={actionUserId === user.id || user.status !== 'active' || tenant.status !== 'active'}>Impersonate</button>
-                        <button className="rounded-lg border border-red-800 px-2.5 py-1.5 font-bold text-red-700 disabled:opacity-50" type="button" onClick={() => deleteUser(user)} disabled={actionUserId === user.id}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {usersLoading ? <p className="py-5 text-slate-400">Loading tenant users…</p> : (
+            <ResponsiveDataTable columns={userColumns} data={users.data} keyField="id" pagination={false} paginationPerPage={5} />
+          )}
           <div className="mt-4 flex items-center justify-between gap-4 text-sm text-slate-400">
             <span>{users.total} users</span>
             <div className="flex items-center gap-3">
@@ -696,37 +692,7 @@ export default function PlatformTenantDetails({ tenantId }: { tenantId: string }
               <h2 className="text-xl font-semibold">Impersonation audit history</h2>
               <p className="mt-1 text-sm text-slate-400">{audits.total} recorded support sessions.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="mobile-card-table text-left">
-                <thead>
-                  <tr>
-                    <th>Started</th>
-                    <th>Platform admin</th>
-                    <th>Impersonated user</th>
-                    <th>Reason</th>
-                    <th>Expires</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {audits.data.length === 0 ? (
-                    <tr><td className="py-5 text-slate-400" colSpan={6}>No impersonation sessions recorded.</td></tr>
-                  ) : audits.data.map((audit) => {
-                    const expired = new Date(audit.expires_at).getTime() <= Date.now();
-                    return (
-                      <tr key={audit.id} className="border-t border-slate-800 align-top">
-                        <td data-label="Started">{new Date(audit.started_at).toLocaleString()}</td>
-                        <td data-label="Platform admin">{audit.platform_admin_username}</td>
-                        <td data-label="Impersonated user">{audit.target_username}</td>
-                        <td data-label="Reason" className="max-w-sm whitespace-normal">{audit.reason}</td>
-                        <td data-label="Expires">{new Date(audit.expires_at).toLocaleString()}</td>
-                        <td data-label="Status"><span className={`platform-chip ${audit.ended_at || expired ? 'is-warning' : ''}`}>{audit.ended_at ? 'Ended' : expired ? 'Expired' : 'Active'}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveDataTable columns={auditColumns} data={auditRows} keyField="id" pagination={false} paginationPerPage={5} />
             <div className="mt-4 flex items-center justify-between gap-4 text-sm text-slate-400">
               <span>Page {audits.current_page} of {audits.last_page}</span>
               <div className="flex items-center gap-3">

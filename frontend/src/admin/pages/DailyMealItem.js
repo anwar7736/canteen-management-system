@@ -7,6 +7,7 @@ import {Link} from "react-router-dom";
 import Axios from 'axios';
 import SideBar from '../components/SideBar';
 import {getFieldErrors, getFormError} from '../../utils/formValidation';
+import ResponsiveDataTable from '../../components/ResponsiveDataTable';
 
 class DailyMealItem extends React.Component{
 	state = {
@@ -194,20 +195,20 @@ class DailyMealItem extends React.Component{
 
  render(){
 	const {data,btnText,show,lunch_expiry_time,dinner_expiry_time,lunch_rate, lunch_rate_bangla, dinner_rate, dinner_rate_bangla,showMeal, lunch_item, dinner_item, day, loadError} = this.state;
-	let serial = 1;
-	const DailyMealItem = data.map(function(item){
-		return (
-			<>
-				<tr>
-                    <td data-label="সিরিয়াল">{serial++}</td>
-                    <td data-label="বার">{item.day}</td>
-                    <td data-label="দুপুরের মেন্যু">{item.lunch_item}</td>
-                    <td data-label="রাতের মেন্যু">{item.dinner_item}</td>
-                    <td data-label="একশন"><button onClick={()=>this.handleItemOpen(item.id)} className="btn btn-success btn-sm">পরিবর্তন</button></td>
-				</tr>
-			</>
-		)
-	},this)
+	const menuColumns = [
+		{name: 'সিরিয়াল', selector: row => row.serial, sortable: true},
+		{name: 'বার', selector: row => row.day, sortable: true},
+		{name: 'দুপুরের মেন্যু', selector: row => row.lunch_item, sortable: true},
+		{name: 'রাতের মেন্যু', selector: row => row.dinner_item, sortable: true},
+		{
+			name: 'একশন',
+			selector: row => row.id,
+			sortable: false,
+			cell: row => <button onClick={()=>this.handleItemOpen(row.id)} className="btn btn-success btn-sm">পরিবর্তন</button>,
+			exportable: false,
+		},
+	];
+	const menuRows = data.map((item, index)=>({...item, serial: index + 1}));
 	return(
 		<Fragment>
 		<SideBar title="Day Wise Meal Item">
@@ -221,22 +222,8 @@ class DailyMealItem extends React.Component{
 						<button className="btn btn-info btn-sm" onClick={this.handleOpen}>মিল রেট পরিবর্তন করুন</button>
 					</center>
 					<h4 className="text-center text-danger mt-4">প্রতিদিনের খাবারের মেন্যুসমূহ নিচে দেওয়া হলঃ-</h4><br/>
-					<div class="table-responsive col-md-10 offset-md-1 text-center">
-                        <table class="table table-bordered table-striped responsive-card-table">
-					  <thead style={{fontSize:'13.5px'}} className="bg-dark text-white">
-					    <tr>
-					      <th scope="col">সিরিয়াল</th>
-					      <th scope="col">বার</th>
-					      <th scope="col">দুপুরের মেন্যু </th>
-					      <th scope="col">রাতের মেন্যু
-					      </th><th scope="col">একশন
-					      </th>
-					    </tr>
-					  </thead>
-					  <tbody style={{fontSize:'13.5px'}}>
-						{DailyMealItem}
-					  </tbody>
-					</table>
+					<div className="col-md-10 offset-md-1">
+						<ResponsiveDataTable columns={menuColumns} data={menuRows} keyField="id" paginationPerPage={7} />
 					</div>
 			</div>
 		</SideBar>

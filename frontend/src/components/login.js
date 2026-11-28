@@ -12,6 +12,8 @@ class Login extends React.Component{
 		state = {
 			username : '',
 			password : '',
+			otp : '',
+			otpRequired : false,
 			isChecked : true,
 			redirectStatus : false,
 			isDisabled : false,
@@ -49,16 +51,44 @@ Login=async (e)=>{
 			cogoToast.error('Open your canteen workspace URL to sign in.');
 			return;
 		}
+		if (!this.state.otpRequired) {
+			const response = await fetch('/api/backend/login/tenant-options', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+				body: JSON.stringify({username: username.trim(), password, role: 'user'}),
+				cache: 'no-store',
+			});
+			const options = await response.json();
+			if (!response.ok) {
+				cogoToast.error(options?.message || 'Username or password is incorrect, or the account is inactive.');
+				return;
+			}
+			const tenant = options?.tenants?.find((item) => item.slug === decodeURIComponent(tenantSlug));
+			if (!tenant) {
+				cogoToast.error('These credentials do not match this canteen.');
+				return;
+			}
+			if (tenant.two_factor_enabled) {
+				this.setState({otpRequired: true, otp: ''});
+				return;
+			}
+		} else if (!/^\d{6}$/.test(this.state.otp)) {
+			this.setState({errors: {...this.state.errors, otp: 'Enter the 6-digit authenticator code.'}});
+			return;
+		}
 		const result = await signIn('credentials', {
 			redirect: false,
 			role: 'user',
 			tenantSlug: decodeURIComponent(tenantSlug),
 			username: username.trim(),
 			password,
+			...(this.state.otpRequired ? {otp: this.state.otp} : {}),
 		});
 		if (!result?.ok) {
 			cogoToast.error(result?.error === 'CredentialsSignin'
-				? 'Username or password is incorrect, or the account is inactive.'
+				? this.state.otpRequired
+					? 'The authenticator code is incorrect or expired.'
+					: 'Username or password is incorrect, or the account is inactive.'
 				: 'Unable to sign in. Please try again.');
 			return;
 		}
@@ -111,6 +141,21 @@ RedirectToHomePage=()=>{
 						    <Form.Control aria-invalid={Boolean(errors.username)} className={errors.username ? 'is-invalid' : ''} value={this.state.username} onChange={(e)=>{this.setState({username:e.target.value, errors: {...this.state.errors, username: ''}})}} type="text" autoComplete="username" placeholder="Enter username" />
 						    {errors.username && <div className="field-error" role="alert">{errors.username}</div>}
 						  </Form.Group>
+						  {this.state.otpRequired && (
+							  <Form.Group className="mt-3" controlId="member-otp">
+								  <Form.Label>Authenticator code</Form.Label>
+								  <Form.Control
+									  value={this.state.otp}
+									  onChange={(event)=>this.setState({otp:event.target.value.replace(/\D/g, '').slice(0, 6), errors: {...this.state.errors, otp: ''}})}
+									  inputMode="numeric"
+									  autoComplete="one-time-code"
+									  maxLength={6}
+									  aria-invalid={Boolean(errors.otp)}
+									  className={errors.otp ? 'is-invalid' : ''}
+								  />
+								  {errors.otp && <div className="field-error" role="alert">{errors.otp}</div>}
+							  </Form.Group>
+						  )}
 						  <Form.Group className="mt-3" controlId="formBasicPassword">
 						    <Form.Label>Password</Form.Label>
 						    <PasswordField aria-invalid={Boolean(errors.password)} className={errors.password ? 'is-invalid' : ''} value={this.state.password} onChange={(e)=>{this.setState({password:e.target.value, errors: {...this.state.errors, password: ''}})}} autoComplete="current-password" placeholder="Enter password" id="password"/>

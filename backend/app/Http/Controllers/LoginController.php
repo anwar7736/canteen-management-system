@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\Totp;
 use App\Tenancy\TenantScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class LoginController extends Controller
         $validated = $req->validate([
             'username' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string', 'max:255'],
+            'otp' => ['nullable', 'digits:6'],
         ]);
         $username = trim($validated['username']);
         $password = $validated['password'];
@@ -27,6 +29,10 @@ class LoginController extends Controller
 
         if ($userInfo->status !== 'active') {
             return 'inactive';
+        }
+        if ($userInfo->two_factor_enabled_at
+            && (empty($validated['otp']) || !Totp::verify($userInfo->two_factor_secret, $validated['otp']))) {
+            return response()->json(['message' => 'The authenticator code is invalid or expired.'], 422);
         }
 
         $user = $userInfo->toArray();
@@ -75,6 +81,7 @@ class LoginController extends Controller
                 'users.id',
                 'users.tenant_id',
                 'users.password',
+                'users.two_factor_enabled_at',
                 'tenants.name as matched_tenant_name',
                 'tenants.slug as matched_tenant_slug',
             ])
@@ -98,6 +105,7 @@ class LoginController extends Controller
                 ->map(fn (Collection $matches) => [
                     'name' => $matches->first()->matched_tenant_name,
                     'slug' => $matches->first()->matched_tenant_slug,
+                    'two_factor_enabled' => $matches->first()->two_factor_enabled_at !== null,
                 ])
                 ->sortBy('name')
                 ->values(),

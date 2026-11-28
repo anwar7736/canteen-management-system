@@ -13,6 +13,7 @@ import {getFieldErrors, getFormError} from '../../utils/formValidation';
 class DailyBazar extends React.Component{
         state={
             dataTable : [],
+            allDataTable: [],
             token_no   : '',
             from_date : '',
             to_date   : '',
@@ -26,7 +27,6 @@ class DailyBazar extends React.Component{
             redirectStatus : false,
             errors : {},
             formError : '',
-            filterErrors : {},
             filterError : '',
         }
 
@@ -38,7 +38,7 @@ class DailyBazar extends React.Component{
             }
              Axios.get(API.GetAllBazarCost)
              .then(response=>{
-                 this.setState({dataTable : response.data});
+                 this.setState({dataTable : response.data, allDataTable: response.data});
 
              })
              .catch(error=>{
@@ -47,7 +47,7 @@ class DailyBazar extends React.Component{
      }
 
        resetForm=()=>{
-            this.setState({from_date : '', to_date : '', filterErrors: {}, filterError: ''});
+            this.setState({from_date : '', to_date : '', filterError: ''});
             this.componentDidMount();
         }
 
@@ -57,13 +57,16 @@ class DailyBazar extends React.Component{
         }
 
       filterByDate=()=>{
-       const {token_no, from_date, to_date} = this.state;
-
-       const filterErrors = {};
-       if (!from_date) filterErrors.from_date = 'Choose a start date.';
-       if (!to_date) filterErrors.to_date = 'Choose an end date.';
-       this.setState({filterErrors, filterError: ''});
-       if (Object.keys(filterErrors).length) return;
+       const {from_date, to_date} = this.state;
+       if (!from_date || !to_date) {
+           this.setState({dataTable: this.state.allDataTable});
+           return;
+       }
+       if (from_date > to_date) {
+           this.setState({filterError: 'The start date must be on or before the end date.'});
+           return;
+       }
+       this.setState({filterError: ''});
        let myData = new FormData();
        myData.append('from_date', from_date);
        myData.append('to_date', to_date);
@@ -76,6 +79,10 @@ class DailyBazar extends React.Component{
             this.setState({filterError: getFormError(error)});
          });
      } 
+
+     handleFilterDateChange=(field, value)=>{
+         this.setState({[field]: value, filterError: ''}, this.filterByDate);
+     }
 
     handleClose=()=>{
         this.setState({show:false});
@@ -251,20 +258,11 @@ class DailyBazar extends React.Component{
  			  <div className="container-fluid animated zoomIn transaction-preview">
                    <button onClick={this.handleOpen} className="btn btn-info">Add Bazar Cost</button>
                     <h3 className="heading-title text-danger text-center m-3">All Bazar Cost Statement</h3><hr/>
-                    <div className="input-group row">
-                        <div className="col-md-4 ">
-                          From : <input value={from_date} aria-invalid={Boolean(this.state.filterErrors.from_date)} onChange={(e)=> {this.setState({from_date:e.target.value, filterErrors: {...this.state.filterErrors, from_date: ''}})}} className={`form-control form-control-sm mx-2 ${this.state.filterErrors.from_date ? 'is-invalid' : ''}`} type="date"/>
-                          {this.state.filterErrors.from_date && <p className="field-error" role="alert">{this.state.filterErrors.from_date}</p>}
-                        </div>
-                        <div className="col-md-4 ">
-                          To : <input value={to_date} aria-invalid={Boolean(this.state.filterErrors.to_date)} onChange={(e)=> {this.setState({to_date:e.target.value, filterErrors: {...this.state.filterErrors, to_date: ''}})}} className={`form-control form-control-sm mx-2 ${this.state.filterErrors.to_date ? 'is-invalid' : ''}`} type="date"/>
-                          {this.state.filterErrors.to_date && <p className="field-error" role="alert">{this.state.filterErrors.to_date}</p>}
-                          {this.state.filterError && <p className="field-error" role="alert">{this.state.filterError}</p>}
-                        </div>
-                        <div className="col-md-4">
-                          <button onClick={this.filterByDate} className="btn btn-sm btn-success mx-2 mt-4">Filter</button>
-                          <button onClick={this.resetForm} className="btn btn-sm btn-danger mx-2 mt-4">Refresh</button>
-                        </div>
+                    <div className="report-date-filters">
+                        <label>From <input value={from_date} onChange={(e)=> this.handleFilterDateChange('from_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                        <label>To <input value={to_date} onChange={(e)=> this.handleFilterDateChange('to_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                        <button onClick={this.resetForm} className="btn btn-sm btn-outline-secondary">Reset dates</button>
+                        {this.state.filterError && <p className="field-error w-100" role="alert">{this.state.filterError}</p>}
                     </div>
                 </div>
                 <hr/>

@@ -11,6 +11,7 @@ import {getFieldErrors, getFormError} from '../../utils/formValidation';
 class DayWiseMeal extends React.Component{
         state={
             dataTable : [],
+            allDataTable: [],
             user_id   : '',
             name      : '',
             address   : '',
@@ -40,7 +41,7 @@ class DayWiseMeal extends React.Component{
 
          Axios.get(API.GetAllMealDetails)
          .then(response=>{
-            this.setState({dataTable : response.data});
+            this.setState({dataTable : response.data, allDataTable: response.data});
 
          })
          .catch(error=>{
@@ -92,28 +93,35 @@ class DayWiseMeal extends React.Component{
             this.componentDidMount();
         }
      
+      handleFilterChange=(field, value)=>{
+          this.setState({[field]: value, formError: ''}, ()=>{
+              const {from_date, to_date, token_no} = this.state;
+              if (!from_date && !to_date && !token_no) {
+                  this.setState({dataTable: this.state.allDataTable});
+                  return;
+              }
+              if ((from_date && !to_date) || (!from_date && to_date)) return;
+              if (from_date && to_date && from_date > to_date) {
+                  this.setState({formError: 'The start date must be on or before the end date.'});
+                  return;
+              }
+              clearTimeout(this.filterTimer);
+              this.filterTimer = setTimeout(this.filterByDate, 250);
+          });
+      }
+
       filterByDate=()=>{
-           const {user_id, from_date, to_date, token_no} = this.state;
+          const {from_date, to_date, token_no} = this.state;
+          if (!token_no && (!from_date || !to_date)) return;
+          const myData = new FormData();
+          myData.append('token_no', token_no);
+          myData.append('from_date', from_date);
+          myData.append('to_date', to_date);
 
-           if(from_date =='' && to_date =='' && token_no == '')
-           {
-             cogoToast.warn('Field must not be empty!');
-           }
-           else{
-                let myData = new FormData();
-                myData.append('token_no', token_no);
-                myData.append('from_date', from_date);
-                myData.append('to_date', to_date);
-
-              Axios.post(API.GetMealByFilter, myData)
-             .then(response=>{
-                 this.setState({dataTable : response.data});
-             })
-             .catch(error=>{
-                
-             })
-           }
-         } 
+          Axios.post(API.GetMealByFilter, myData)
+              .then(response=>this.setState({dataTable : response.data}))
+              .catch(error=>this.setState({formError: getFormError(error)}));
+      }
 
        printIconOnClick=(order_id)=>{
           Axios.get(API.GetMealByOrderId + order_id)
@@ -233,18 +241,12 @@ class DayWiseMeal extends React.Component{
             <SideBar title="Day Wise Meal Details">
  			  <div className={mainDiv + " container-fluid animated zoomIn transaction-preview"}>
                     <h3 className="heading-title text-danger text-center m-3">Day Wise Meal Report</h3><hr/>
-                    <div className="input-group row">
-                       <div className="col-md-4">
-                             From : <input value={from_date} onChange={(e)=> {this.setState({from_date:e.target.value})}} className=" form-control form-control-sm mx-2" type="date"/>
-                            To : <input value={to_date} onChange={(e)=> {this.setState({to_date:e.target.value})}} className=" form-control form-control-sm mx-2" type="date"/>
-                       </div>
-                       <div className="col-md-4">
-                            Token No : <input value={token_no} onChange={(e)=> {this.setState({token_no:e.target.value})}} placeholder="Token No..." className=" form-control form-control-sm mx-2" type="text"/>
-                       </div>
-                       <div className="col-md-6">
-                            <button onClick={this.filterByDate} className="btn btn-sm btn-success m-2">Filter</button>
-                            <button onClick={this.resetForm} className="btn btn-sm btn-danger m-2">Refresh</button>
-                       </div>
+                    <div className="report-date-filters">
+                       <label>From <input value={from_date} onChange={(e)=>this.handleFilterChange('from_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                       <label>To <input value={to_date} onChange={(e)=>this.handleFilterChange('to_date', e.target.value)} className="form-control form-control-sm" type="date"/></label>
+                       <label>Token No <input value={token_no} onChange={(e)=>this.handleFilterChange('token_no', e.target.value)} placeholder="Any token" className="form-control form-control-sm" type="text"/></label>
+                       <button onClick={this.resetForm} className="btn btn-sm btn-outline-secondary">Reset filters</button>
+                       {this.state.formError && <p className="field-error w-100" role="alert">{this.state.formError}</p>}
                     </div>
                     <ResponsiveDataTable
                         noHeader={true}

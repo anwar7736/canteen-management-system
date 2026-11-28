@@ -8,10 +8,10 @@ import {
   faBuilding,
   faCircleCheck,
   faLayerGroup,
-  faMagnifyingGlass,
   faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 import confirmAction from '../../utils/confirmAction';
+import ResponsiveDataTable from '../ResponsiveDataTable';
 
 type Tenant = {
   id: number;
@@ -41,13 +41,11 @@ export default function PlatformDashboard() {
   const [tenantLastPage, setTenantLastPage] = useState(1);
   const [tenantTotal, setTenantTotal] = useState(0);
   const [tenantsLoading, setTenantsLoading] = useState(true);
-  const [tenantSearch, setTenantSearch] = useState('');
   const [tenantStatus, setTenantStatus] = useState('all');
 
   const visibleTenants = tenants.filter((tenant) => {
-    const matchesSearch = `${tenant.name} ${tenant.slug}`.toLowerCase().includes(tenantSearch.trim().toLowerCase());
     const matchesStatus = tenantStatus === 'all' || tenant.status === tenantStatus;
-    return matchesSearch && matchesStatus;
+    return matchesStatus;
   });
 
   useEffect(() => {
@@ -129,6 +127,51 @@ export default function PlatformDashboard() {
     }
   }
 
+  const tenantColumns = [
+    {
+      name: 'Canteen',
+      selector: (tenant: Tenant) => tenant.name,
+      sortable: true,
+    },
+    {
+      name: 'Slug',
+      selector: (tenant: Tenant) => `/t/${tenant.slug}`,
+      sortable: true,
+    },
+    {
+      name: 'Users',
+      selector: (tenant: Tenant) => tenant.users_count,
+      sortable: true,
+    },
+    {
+      name: 'Status',
+      selector: (tenant: Tenant) => tenant.status,
+      sortable: true,
+    },
+    {
+      name: 'Actions',
+      selector: (tenant: Tenant) => tenant.id,
+      sortable: false,
+      exportable: false,
+      cell: (tenant: Tenant) => (
+        <div className="flex flex-wrap gap-2">
+          <Link className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-emerald-800" href={`/platform/tenants/${tenant.id}`}>
+            <FontAwesomeIcon icon={faArrowUpRightFromSquare} aria-hidden="true" />
+            Manage
+          </Link>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold"
+            onClick={() => updateTenantStatus(tenant)}
+            disabled={pendingTenantId === tenant.id}
+          >
+            {pendingTenantId === tenant.id ? 'Saving…' : tenant.status === 'active' ? 'Suspend' : 'Activate'}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <section className="platform-page">
       <div>
@@ -170,10 +213,6 @@ export default function PlatformDashboard() {
               <h2 className="m-0 text-xl font-extrabold">Canteens</h2>
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <label className="relative block min-w-0 flex-1 sm:min-w-64">
-                <FontAwesomeIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" icon={faMagnifyingGlass} aria-hidden="true" />
-                <input className="platform-search w-full pl-9" value={tenantSearch} onChange={(event) => setTenantSearch(event.target.value)} placeholder="Search canteens" aria-label="Search canteens" />
-              </label>
               <select className="platform-filter" value={tenantStatus} onChange={(event) => setTenantStatus(event.target.value)} aria-label="Filter by canteen status">
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
@@ -181,57 +220,13 @@ export default function PlatformDashboard() {
               </select>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="mobile-card-table text-left">
-              <thead>
-                <tr>
-                  <th>Canteen</th>
-                  <th>Slug</th>
-                  <th>Users</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTenants.map((tenant) => (
-                  <tr key={tenant.id} className="border-t border-slate-800">
-                    <td data-label="Canteen" className="font-semibold">
-                      <Link className="text-emerald-300 hover:text-emerald-200" href={`/platform/tenants/${tenant.id}`}>
-                        {tenant.name}
-                      </Link>
-                    </td>
-                    <td data-label="Workspace">/t/{tenant.slug}</td>
-                    <td data-label="People">{tenant.users_count}</td>
-                    <td data-label="Status"><span className={`platform-chip ${tenant.status === 'active' ? '' : 'is-danger'}`}>{tenant.status}</span></td>
-                    <td data-label="Actions">
-                      <div className="flex flex-wrap gap-2">
-                        <Link className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-emerald-800" href={`/platform/tenants/${tenant.id}`}>
-                          <FontAwesomeIcon icon={faArrowUpRightFromSquare} aria-hidden="true" />
-                          Manage
-                        </Link>
-                      <button
-                        type="button"
-                        className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold"
-                        onClick={() => updateTenantStatus(tenant)}
-                        disabled={pendingTenantId === tenant.id}
-                      >
-                        {pendingTenantId === tenant.id ? 'Saving…' : tenant.status === 'active' ? 'Suspend' : 'Activate'}
-                      </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!tenantsLoading && visibleTenants.length === 0 && (
-                  <tr>
-                    <td className="py-5 text-slate-400" colSpan={5}>{tenants.length ? 'No canteens match these filters.' : 'No canteens found.'}</td>
-                  </tr>
-                )}
-                {tenantsLoading && (
-                  <tr><td className="py-5 text-slate-400" colSpan={5}>Loading canteens…</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveDataTable
+            columns={tenantColumns}
+            data={visibleTenants}
+            keyField="id"
+            pagination={false}
+            paginationPerPage={5}
+          />
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
             <span>Showing {visibleTenants.length} of {tenants.length} on this page · {tenantTotal} total</span>
             <div className="flex items-center gap-3">

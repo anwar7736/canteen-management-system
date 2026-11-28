@@ -13,6 +13,7 @@ import {getFieldErrors, getFormError} from '../../utils/formValidation';
 class SendNotification extends React.Component{
 	state = {
 		showReceiver : 'd-none',
+		activeTab : 'database',
 		customChecked : false,
 		allChecked : true,
 		redirectStatus : false,
@@ -163,20 +164,6 @@ class SendNotification extends React.Component{
 	    	this.setState({showReceiver : 'd-none', customChecked : false, allChecked : true});
 	    }
 	}
-	sendVia = (evt, cityName)=> {
-	  let i, tabcontent, tablinks;
-	  tabcontent = document.getElementsByClassName("tabcontent");
-	  for (i = 0; i < tabcontent.length; i++) {
-	    tabcontent[i].style.display = "none";
-	  }
-	  tablinks = document.getElementsByClassName("tablinks");
-	  for (i = 0; i < tablinks.length; i++) {
-	    tablinks[i].className = tablinks[i].className.replace(" active", "");
-	  }
-	  document.getElementById(cityName).style.display = "block";
-	  evt.currentTarget.className += " active";
-	}
-
     RedirectToLogin=()=>{
     if(this.state.redirectStatus===true)
     {
@@ -315,53 +302,71 @@ EditNotification=()=>{
  	return(
  		<Fragment>
  		<SideBar title="Send Notification">
-			<div class="animated zoomIn">
-				<div class=" container-fluid m-4">
+			<div className="animated zoomIn">
+				<div className="container-fluid m-4">
 			<h4 className="text-danger"><center>Send Notification</center></h4>
 			<hr/>
-			  <div class="tab">
-			    <button class="tablinks active" onClick={(event)=>this.sendVia(event, 'database')}>Database</button>
-			    <button class="tablinks" onClick={(event)=>this.sendVia(event, 'email')}>E-mail</button>
-			    <button class="tablinks" onClick={(event)=>this.sendVia(event, 'sms')}>SMS</button>
+			  <div className="notification-tabs" role="tablist" aria-label="Notification delivery method">
+			    {[
+					{key: 'database', label: 'In-app message'},
+					{key: 'email', label: 'E-mail'},
+					{key: 'sms', label: 'SMS'},
+				].map(({key, label}) => (
+					<button
+						key={key}
+						id={`notification-tab-${key}`}
+						type="button"
+						role="tab"
+						aria-selected={this.state.activeTab === key}
+						aria-controls={`notification-panel-${key}`}
+						className={`notification-tab${this.state.activeTab === key ? ' active' : ''}`}
+						onClick={() => this.setState({activeTab: key, errors: {}, formError: ''})}
+					>
+						{label}
+					</button>
+				))}
 			  </div>
 
-			<div id="database" class="tabcontent" style={{display:'block'}}>
+			{this.state.activeTab === 'database' && (
+			<div id="notification-panel-database" className="notification-panel" role="tabpanel" aria-labelledby="notification-tab-database" tabIndex={0}>
 				<br/>
 			  <h5><center>Notification Send via Database</center></h5>
 			 <hr/>
 			   <form method="POST" onSubmit={this.SendMessage}>
-			      <div class="form-group">
-			        <label for="name">Your Name :</label>
-			        <input type="text" className={`form-control ${this.state.errors.author_name ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.author_name)} value={author_name} onChange={(e)=>this.setState({author_name:e.target.value, errors: {...this.state.errors, author_name: ''}, formError: ''})} placeholder="Enter your name..." id="name0"/>
+			      <div className="form-group">
+			        <label htmlFor="database-author">Your Name :</label>
+			        <input type="text" className={`form-control ${this.state.errors.author_name ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.author_name)} value={author_name} onChange={(e)=>this.setState({author_name:e.target.value, errors: {...this.state.errors, author_name: ''}, formError: ''})} placeholder="Enter your name..." id="database-author"/>
 					{this.state.errors.author_name && <p className="field-error" role="alert">{this.state.errors.author_name}</p>}
 			      </div>
-			      <div class="form-group">
-			        <label for="title">Message Title :</label>
-			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
+			      <div className="form-group">
+			        <label htmlFor="database-title">Message Title :</label>
+			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="database-title"/>
 					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
 			      </div>
-			      <div class="form-group">
-			        <label for="body">Message Body :</label>
-			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
+			      <div className="form-group">
+			        <label htmlFor="database-body">Message Body :</label>
+			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="database-body">
 			        </textarea>
 					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
 			      </div>
 				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
-			      <button type="submit" class="btn btn-success">Send</button>
-			   	  <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
+			      <button type="submit" className="btn btn-success" disabled={this.state.isDisabled}>Send</button>
+				  <button type="button" onClick={this.clearForm} className="btn btn-outline-secondary m-2">Clear</button>
 			    </form>   
 
 
 			</div>
+			)}
 
-			<div id="email" class="tabcontent">
+			{this.state.activeTab === 'email' && (
+			<div id="notification-panel-email" className="notification-panel" role="tabpanel" aria-labelledby="notification-tab-email" tabIndex={0}>
 					<br/>
 			   <h5><center>Notification Send via E-mail</center></h5>
 			    <hr/>
 			  <form method="POST" onSubmit={this.sendEmail}>
-			      <div class="form-group">
-			        <label for="name">From :</label>
-			        <input type="email" class="form-control" value={sender_email}  disabled placeholder="Sender email address..." id="name2"/>
+			      <div className="form-group">
+			        <label htmlFor="email-sender">From :</label>
+			        <input type="email" className="form-control" value={sender_email}  disabled placeholder="Sender email address..." id="email-sender"/>
 			      </div>
 			      {/*
 			      	<div class="form-group">
@@ -375,61 +380,35 @@ EditNotification=()=>{
 			        <input type="text" className={showReceiver + " form-control"} value={receivers}  onChange={(e)=>this.setState({receivers:e.target.value})} placeholder="Enter receivers mail address..." id="name"/>
 			      </div>
 			      */}
-			      <div class="form-group">
-			        <label for="title">Message Title :</label>
-			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
+			      <div className="form-group">
+			        <label htmlFor="email-title">Message Title :</label>
+			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="email-title"/>
 					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
 			      </div>
-			      <div class="form-group">
-			        <label for="body">Message Body :</label>
-			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
+			      <div className="form-group">
+			        <label htmlFor="email-body">Message Body :</label>
+			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="email-body">
 			        </textarea>
 					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
 			      </div>
 				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
-			      <button type="submit" class="btn btn-success">Send</button>
-			      <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
+			      <button type="submit" className="btn btn-success" disabled={this.state.isDisabled}>Send</button>
+			      <button type="button" onClick={this.clearForm} className="btn btn-outline-secondary m-2">Clear</button>
 			    </form> 
 			</div>
-		<div id="sms" class="tabcontent">
+			)}
+		{this.state.activeTab === 'sms' && (
+		<div id="notification-panel-sms" className="notification-panel" role="tabpanel" aria-labelledby="notification-tab-sms" tabIndex={0}>
 					<br/>
 			   <h5><center>Notification Send via SMS</center></h5>
 			    <hr/>
-			  <form method="POST" onSubmit={this.sendEmail}>
-			      <div class="form-group">
-			        <label for="name">From :</label>
-			        <input type="text" class="form-control" value={sender_mobile}  disabled placeholder="Sender phone number..." id="name2"/>
-			      </div>
-			      {/*
-			      	<div class="form-group">
-			        <label for="name">To :</label>
-			        <label>
-			        	<input type="radio" className="ml-3" checked={customChecked} name="via" onClick={(e)=>this.onshowReceivers('custom')} id="custom" value=""/> Custom
-			        </label>
-			        <label>
-			        	<input type="radio" className="ml-3" checked={allChecked} name="via" onClick={(e)=>this.onshowReceivers('all')} id="all" value=""/> All
-			        </label>
-			        <input type="text" className={showReceiver + " form-control"} value={receivers}  onChange={(e)=>this.setState({receivers:e.target.value})} placeholder="Enter receivers mail address..." id="name"/>
-			      </div>
-			      */}
-			      <div class="form-group">
-			        <label for="title">Message Title :</label>
-			        <input type="text" className={`form-control ${this.state.errors.msg_title ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_title)} value={msg_title} onChange={(e)=>this.setState({msg_title:e.target.value, errors: {...this.state.errors, msg_title: ''}, formError: ''})} placeholder="Enter message title..." id="title"/>
-					{this.state.errors.msg_title && <p className="field-error" role="alert">{this.state.errors.msg_title}</p>}
-			      </div>
-			      <div class="form-group">
-			        <label for="body">Message Body :</label>
-			        <textarea rows="5" className={`form-control ${this.state.errors.msg_body ? 'is-invalid' : ''}`} aria-invalid={Boolean(this.state.errors.msg_body)} value={msg_body} onChange={(e)=>this.setState({msg_body:e.target.value, errors: {...this.state.errors, msg_body: ''}, formError: ''})} id="body">
-			        </textarea>
-					{this.state.errors.msg_body && <p className="field-error" role="alert">{this.state.errors.msg_body}</p>}
-			      </div>
-				  {this.state.formError && <p className="field-error" role="alert">{this.state.formError}</p>}
-			      <button type="submit" class="btn btn-success">Send</button>
-			      <button type="button" onClick={this.clearForm} class="btn btn-danger m-2">Clear</button>
-			    </form> 
+			  <div className="notification-unavailable" role="status">
+				  SMS delivery is not configured yet. Configure an SMS provider before sending text messages.
+			  </div>
 			</div>
-		<div class="">
-			<div class=" m-4">
+			)}
+		<div>
+			<div className="m-4">
 			<h4 className="text-danger"><center>All Sending Notification List</center></h4><hr/>
 				  <ResponsiveDataTable
 	                noHeader={true}

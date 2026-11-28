@@ -5,6 +5,7 @@ import API from '../api/API';
 import {Navigate} from 'react-router-dom';
 import {Link} from "react-router-dom";
 import Axios from 'axios';
+import ResponsiveDataTable from './ResponsiveDataTable';
 
 class DailyMealItem extends React.Component{
 	state = {
@@ -46,19 +47,13 @@ class DailyMealItem extends React.Component{
 	}
  render(){
  	const {data, lunch_expiry_time, dinner_expiry_time, lunch_rate_bangla, dinner_rate_bangla} = this.state;
- 	let serial = 1;
- 	const DailyMealItem = data.map(function(item){
- 		return (
- 			<>
- 				<tr>
-                    <td data-label="সিরিয়াল">{serial++}</td>
-                    <td data-label="বার">{item.day}</td>
-                    <td data-label="দুপুরের মেন্যু">{item.lunch_item}</td>
-                    <td data-label="রাতের মেন্যু">{item.dinner_item}</td>
-	 			</tr>
- 			</>
- 		)
- 	})
+	const menuColumns = [
+		{name: 'সিরিয়াল', selector: row => row.serial, sortable: true},
+		{name: 'বার', selector: row => row.day, sortable: true},
+		{name: 'দুপুরের মেন্যু', selector: row => row.lunch_item, sortable: true},
+		{name: 'রাতের মেন্যু', selector: row => row.dinner_item, sortable: true},
+	];
+	const menuRows = data.map((item, index)=>({...item, serial: index + 1}));
  	return(
  		<Fragment>
  			<div className="mt-3 animated zoomIn" style={{marginBottom:'100px'}}>
@@ -69,21 +64,8 @@ class DailyMealItem extends React.Component{
  					</center>
  					<h3 className="text-center text-success mt-4">প্রতিদিনের খাবারের মেন্যুসমূহ নিচে দেওয়া হলঃ-</h3><br/>
  					<h6 className="text-center text-danger">প্রয়োজন অনুসারে এই তালিকা পরিবর্তন হতে পারে</h6><br/>
- 					<div class="table-responsive col-md-10 offset-md-1 text-center">
-                        <table class="table table-bordered table-striped responsive-card-table">
-					  <thead style={{fontSize:'13.5px'}} className="bg-dark text-white">
-					    <tr>
-					      <th scope="col">সিরিয়াল</th>
-					      <th scope="col">বার</th>
-					      <th scope="col">দুপুরের মেন্যু </th>
-					      <th scope="col">রাতের মেন্যু
-					      </th>
-					    </tr>
-					  </thead>
-					  <tbody style={{fontSize:'13.5px'}}>
-					    	{DailyMealItem}
-					  </tbody>
-					</table>
+					<div className="col-md-10 offset-md-1">
+						<ResponsiveDataTable columns={menuColumns} data={menuRows} keyField="id" paginationPerPage={7} />
  					</div>
  			</div>
  		</Fragment>

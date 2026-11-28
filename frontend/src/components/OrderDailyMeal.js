@@ -27,6 +27,7 @@ class UserList extends React.Component{
             no  : true,
             errors : {},
             formError : '',
+            saving : false,
 
         }
     componentDidMount(){
@@ -63,6 +64,7 @@ class UserList extends React.Component{
         if (!Number.isInteger(dinnerQuantity) || dinnerQuantity < 0 || dinnerQuantity > 5) errors.dinner = 'Enter a whole number from 0 to 5.';
         this.setState({errors, formError: ''});
         if (Object.keys(errors).length) return;
+        this.setState({saving: true});
 
         if(editID == ''){
             let myOrder = new FormData();
@@ -82,13 +84,14 @@ class UserList extends React.Component{
 
                     }
                     else{
-                         this.setState({formError: String(response.data)});
+                         this.setState({saving: false, formError: String(response.data)});
                     }
                  })
                  .catch(error=>{
                     const fieldErrors = getFieldErrors(error);
                     this.setState({
                         errors: fieldErrors,
+                        saving: false,
                         formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
                     });
                  })
@@ -112,6 +115,7 @@ class UserList extends React.Component{
 
                     }
                     else{
+                        this.setState({saving: false});
                         this.handleClose();
                          cogoToast.info('Nothing to Changes');
                     }
@@ -121,6 +125,7 @@ class UserList extends React.Component{
                     const fieldErrors = getFieldErrors(error);
                     this.setState({
                         errors: fieldErrors,
+                        saving: false,
                         formError: Object.keys(fieldErrors).length ? '' : getFormError(error),
                     });
                  })
@@ -128,7 +133,7 @@ class UserList extends React.Component{
      }
     }
     resetForm=()=>{
-        this.setState({ lunch : '', dinner : '', yes : false, no : true, notes: '', btnText : 'Save Order', modalTitle : 'Order Today Meal', editID : '', deleteID : '', errors: {}, formError: ''});
+        this.setState({ lunch : '0', dinner : '0', yes : false, no : true, notes: '', btnText : 'Save Order', modalTitle : 'Order Today Meal', editID : '', deleteID : '', errors: {}, formError: '', saving: false});
     }
 
     handleClose=()=>{
@@ -302,20 +307,26 @@ class UserList extends React.Component{
                     <Modal.Header>
                         <strong><p className="text-danger">{this.state.modalTitle}</p></strong>
                     </Modal.Header>
-                    <Modal.Body>
+                    <Modal.Body className="meal-order-modal">
                         <label className="form-label"><b>Your Name</b></label>
                         <input value={name} disabled className="form-control form-control-sm" type="text"/> 
                         <label className="form-label "><b>Your Token No</b></label>
                         <input value={token_no} disabled className="form-control form-control-sm" type="text"/>
                          <label className="form-label"><b>Meal Order Date</b></label>
                         <input value={order_date} disabled className="form-control form-control-sm" type="text"/><br/>
-                        <label className="form-label"><b>Enter Your Meal Quantity</b></label><br/>
-                        <label className="form-label"><b>Lunch</b></label><br/>
-                        <input type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.lunch)} className={this.state.errors.lunch ? 'is-invalid' : ''} onChange={(e)=> {this.setState({lunch:e.target.value, errors: {...this.state.errors, lunch: '', meal: ''}, formError: ''})}} value={lunch}/>
-                        {this.state.errors.lunch && <p className="field-error" role="alert">{this.state.errors.lunch}</p>}
-                        <label className="form-label"><b>Dinner</b></label><br/>
-                        <input type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.dinner)} className={this.state.errors.dinner ? 'is-invalid' : ''} onChange={(e)=> {this.setState({dinner:e.target.value, errors: {...this.state.errors, dinner: '', meal: ''}, formError: ''})}} value={dinner}/>
-                        {this.state.errors.dinner && <p className="field-error" role="alert">{this.state.errors.dinner}</p>}
+                        <label className="form-label"><b>Meal quantities</b></label>
+                        <div className="meal-quantity-grid">
+                            <div className="meal-quantity-field">
+                                <label className="form-label" htmlFor="member-order-lunch">Lunch</label>
+                                <input id="member-order-lunch" type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.lunch)} className={`form-control ${this.state.errors.lunch ? 'is-invalid' : ''}`} onChange={(e)=> {this.setState({lunch:e.target.value, errors: {...this.state.errors, lunch: '', meal: ''}, formError: ''})}} value={lunch}/>
+                                {this.state.errors.lunch && <p className="field-error" role="alert">{this.state.errors.lunch}</p>}
+                            </div>
+                            <div className="meal-quantity-field">
+                                <label className="form-label" htmlFor="member-order-dinner">Dinner</label>
+                                <input id="member-order-dinner" type="number" min="0" max="5" aria-invalid={Boolean(this.state.errors.dinner)} className={`form-control ${this.state.errors.dinner ? 'is-invalid' : ''}`} onChange={(e)=> {this.setState({dinner:e.target.value, errors: {...this.state.errors, dinner: '', meal: ''}, formError: ''})}} value={dinner}/>
+                                {this.state.errors.dinner && <p className="field-error" role="alert">{this.state.errors.dinner}</p>}
+                            </div>
+                        </div>
                         {this.state.errors.meal && <p className="field-error" role="alert">{this.state.errors.meal}</p>}
                         <br/>
                         <label className="form-label"><b>Do you want to take home delivery?</b></label><br/>
@@ -330,8 +341,8 @@ class UserList extends React.Component{
                         <Button className="btn-sm btn-danger" onClick={this.handleClose}>
                             Close
                         </Button>
-                        <button  className="btn btn-sm btn-success"  onClick={this.onSubmitHandler}>
-                            {btnText}
+                        <button className="btn btn-sm btn-success" onClick={this.onSubmitHandler} disabled={this.state.saving}>
+                            {this.state.saving ? 'Saving...' : btnText}
                         </button>
                     </Modal.Footer>
                 </Modal>

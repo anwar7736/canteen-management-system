@@ -8,6 +8,10 @@ class API {
 	static OTPVerification   = this.baseURL + "OTPVerification";
 	static ResetPassword   = this.baseURL + "ResetPassword";
 	static ChangePassword   = this.baseURL + "ChangePassword";
+	static TwoFactorStatus = this.baseURL + "user/security/two-factor";
+	static TwoFactorSetup = this.baseURL + "user/security/two-factor/setup";
+	static TwoFactorConfirm = this.baseURL + "user/security/two-factor/confirm";
+	static TwoFactorDisable = this.baseURL + "user/security/two-factor/disable";
 	static Logout   = this.baseURL + "logout";
 	static GetUserProfile   = this.baseURL + "GetUserProfile";
 	static GetShopName   = this.baseURL + "GetPublicProfileInfo";

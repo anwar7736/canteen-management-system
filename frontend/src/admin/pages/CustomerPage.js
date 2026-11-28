@@ -28,6 +28,9 @@ class CustomerPage extends Component {
             picture : '',
             token_no : '',
             selectedID : '',
+            selectedIDs: [],
+            clearSelectionToggle: false,
+            deleting: false,
 			addNewModal : false,          
             headerTitle : '',
             submitBtnText : '',
@@ -190,23 +193,51 @@ class CustomerPage extends Component {
         });
 }
 	onDelete=async()=>{
-        const id = this.state.selectedID;
-		if(id!==null && await confirmAction({
+        const ids = this.state.selectedIDs;
+		if(ids.length && await confirmAction({
+            title: `Delete ${ids.length} selected member${ids.length === 1 ? '' : 's'}?`,
+            text: 'This action cannot be undone.',
+            confirmButtonText: 'Delete selected',
+        })){
+            this.deleteMembers(ids);
+		}
+	}
+
+    deleteMember=async(id)=>{
+        if (await confirmAction({
             title: 'Delete this member?',
             text: 'This action cannot be undone.',
             confirmButtonText: 'Delete member',
-        })){
-			Axios.get(API.DeleteMember + id)
-			.then(response=>{
-					cogoToast.success('Member has been deleted');
-					this.componentDidMount();
-					this.setState({selectedID:''})
-			})
-			.catch(error=>{
-				cogoToast.error('Something went wrong!');
-			})
-		}
-	}
+        })) {
+            this.deleteMembers([id]);
+        }
+    }
+
+    deleteMembers=async(ids)=>{
+        this.setState({deleting: true});
+        const results = await Promise.allSettled(ids.map((id)=>Axios.get(API.DeleteMember + id)));
+        const deletedIds = [];
+        results.forEach((result, index)=>{
+            if (result.status === 'fulfilled' && result.value.status === 200 && result.value.data == 1) {
+                deletedIds.push(ids[index]);
+            }
+        });
+        this.setState((state)=>({
+            Data: state.Data.filter((member)=>!deletedIds.includes(member.id)),
+            selectedID: '',
+            selectedIDs: [],
+            clearSelectionToggle: !this.state.clearSelectionToggle,
+            isDisabled: true,
+            token_view: 'd-none',
+            deleting: false,
+        }));
+        if (deletedIds.length === ids.length) {
+            cogoToast.success(ids.length === 1 ? 'Member has been deleted' : 'Selected members have been deleted');
+        } else {
+            cogoToast.error(`${deletedIds.length} of ${ids.length} members were deleted. Some deletions failed; refresh the list and try again.`);
+            this.componentDidMount();
+        }
+    }
 
     printToken=(id)=>{
         Axios.get(API.GetUserProfile + id)
@@ -258,13 +289,28 @@ class CustomerPage extends Component {
          {name: 'Email', selector: row => row.email, sortable: true},
          {name: 'Phone', selector: row => row.phone, sortable: true},
          {name: 'Status', selector: row => row.status, sortable: true},
+         {
+            name: 'Actions',
+            selector: row => row.id,
+            sortable: false,
+            cell: row => (
+                <div className="customer-row-actions">
+                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={()=>this.setState({selectedID: row.id}, ()=>this.modalOpen('Update'))}>Edit</button>
+                    <button type="button" className="btn btn-sm btn-outline-danger" onClick={()=>this.deleteMember(row.id)} disabled={this.state.deleting}>Delete</button>
+                </div>
+            ),
+         },
 		];
 		const onSelectedRowsChange = ({selectedRows}) => {
-            const selected = selectedRows[0];
-            if (selected) {
-                this.setState({selectedID: selected.id, isDisabled: false});
-                this.printToken(selected.id);
-            }
+            const selectedIDs = selectedRows.map((selected)=>selected.id);
+            const selected = selectedRows.length === 1 ? selectedRows[0] : null;
+            this.setState({
+                selectedIDs,
+                selectedID: selected ? selected.id : '',
+                isDisabled: selectedIDs.length === 0,
+                token_view: selected ? this.state.token_view : 'd-none',
+            });
+            if (selected) this.printToken(selected.id);
         };
 
         return (
@@ -273,16 +319,22 @@ class CustomerPage extends Component {
                     <div className={mainDiv + " animated zoomIn"}>
                         <h2 className="text-center text-danger">All Customer List</h2>
                         <Button onClick={this.modalOpen.bind(this, 'Insert')} variant="success" className="btn-sm m-1">Add</Button>
-                        <Button onClick={this.modalOpen.bind(this, 'Update')} variant="info" className="btn-sm m-1" disabled={this.state.isDisabled}>Edit</Button>
-                        <Button onClick={this.onDelete} variant="danger" className="btn-sm m-1" disabled={this.state.isDisabled}>Delete</Button>
-                        <Button onClick={this.print} variant="primary" className="btn-sm m-1" disabled={this.state.isDisabled}>Print Token</Button><br/><br/>
+                        {this.state.selectedIDs.length > 0 && (
+                            <Button onClick={this.onDelete} variant="danger" className="btn-sm m-1" disabled={this.state.deleting}>
+                                {this.state.deleting ? 'Deleting…' : `Delete selected (${this.state.selectedIDs.length})`}
+                            </Button>
+                        )}
+                        {this.state.selectedIDs.length === 1 && (
+                            <Button onClick={this.print} variant="primary" className="btn-sm m-1">Print Token</Button>
+                        )}
+                        <br/><br/>
                         <ResponsiveDataTable
                             keyField="id"
                             data={allData}
                             columns={columns}
                             pagination
                             selectableRows
-                            selectableRowsSingle
+                            clearSelectedRows={this.state.clearSelectionToggle}
                             onSelectedRowsChange={onSelectedRowsChange}
                         />
                    

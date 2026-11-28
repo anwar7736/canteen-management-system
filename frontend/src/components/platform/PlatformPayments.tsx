@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCreditCard, faMagnifyingGlass, faSackDollar } from '@fortawesome/free-solid-svg-icons';
+import { faCreditCard, faSackDollar } from '@fortawesome/free-solid-svg-icons';
+import ResponsiveDataTable from '../ResponsiveDataTable';
 
 type PaymentRecord = {
   id: number;
@@ -57,16 +58,22 @@ export default function PlatformPayments() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const visiblePayments = paymentPage.data.filter((payment) => {
-    const searchText = `${payment.transaction_id} ${payment.tenant?.name || ''} ${payment.tenant?.slug || ''} ${payment.plan?.name || ''}`.toLowerCase();
-    return searchText.includes(query.trim().toLowerCase())
-      && (statusFilter === 'all' || paymentStatusCategory(payment.status) === statusFilter);
+    return statusFilter === 'all' || paymentStatusCategory(payment.status) === statusFilter;
   });
   const paidOnPage = paymentPage.data.filter((payment) => paymentStatusCategory(payment.status) === 'paid');
   const paidAmount = paidOnPage.reduce((total, payment) => total + Number(payment.amount), 0);
+  const paymentColumns = [
+    {name: 'Canteen', selector: (payment: PaymentRecord) => payment.tenant?.name || 'Deleted canteen', sortable: true},
+    {name: 'Plan', selector: (payment: PaymentRecord) => payment.plan?.name || 'Deleted plan', sortable: true},
+    {name: 'Transaction', selector: (payment: PaymentRecord) => payment.transaction_id, sortable: true},
+    {name: 'Amount', selector: (payment: PaymentRecord) => `${payment.currency} ${Number(payment.amount).toLocaleString()}`, sortable: true},
+    {name: 'Status', selector: (payment: PaymentRecord) => payment.status, sortable: true},
+    {name: 'Gateway', selector: (payment: PaymentRecord) => payment.gateway, sortable: true},
+    {name: 'Paid at', selector: (payment: PaymentRecord) => formatDate(payment.paid_at), sortable: true},
+  ];
 
   useEffect(() => {
     let active = true;
@@ -139,10 +146,6 @@ export default function PlatformPayments() {
             <p className="mb-0 mt-1 text-sm text-slate-400">Filters apply to the currently loaded page.</p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <label className="relative block min-w-0 flex-1 sm:min-w-64">
-              <FontAwesomeIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" icon={faMagnifyingGlass} aria-hidden="true" />
-              <input className="platform-search w-full pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search transaction, canteen or plan" aria-label="Search payments" />
-            </label>
             <select className="platform-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter by payment status">
               <option value="all">All statuses</option>
               <option value="paid">Paid</option>
@@ -151,45 +154,15 @@ export default function PlatformPayments() {
             </select>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="mobile-card-table text-left">
-            <thead>
-              <tr>
-                <th>Canteen</th>
-                <th>Plan</th>
-                <th>Transaction</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Gateway</th>
-                <th>Paid at</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td className="py-6 text-slate-400" colSpan={7}>Loading payments…</td></tr>
-              ) : visiblePayments.length === 0 ? (
-                <tr><td className="py-6 text-slate-400" colSpan={7}>{paymentPage.data.length ? 'No payments match these filters.' : 'No subscription payments found.'}</td></tr>
-              ) : visiblePayments.map((payment) => (
-                <tr key={payment.id} className="border-t border-slate-800">
-                  <td data-label="Canteen">
-                    <div className="font-medium">{payment.tenant?.name || 'Deleted canteen'}</div>
-                    {payment.tenant?.slug && <div className="text-xs text-slate-400">{payment.tenant.slug}</div>}
-                  </td>
-                  <td data-label="Plan">{payment.plan?.name || 'Deleted plan'}</td>
-                  <td data-label="Transaction" className="font-mono text-xs">{payment.transaction_id}</td>
-                  <td data-label="Amount">{payment.currency} {Number(payment.amount).toLocaleString()}</td>
-                  <td data-label="Status">
-                    <span className={`platform-chip ${paymentStatusCategory(payment.status) === 'paid' ? '' : paymentStatusCategory(payment.status) === 'pending' ? 'is-warning' : 'is-danger'}`}>
-                      {paymentStatusCategory(payment.status) === 'paid' ? 'Paid' : payment.status}
-                    </span>
-                  </td>
-                  <td data-label="Gateway" className="capitalize">{payment.gateway}</td>
-                  <td data-label="Paid at">{formatDate(payment.paid_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {loading ? <p className="py-6 text-slate-400">Loading payments…</p> : (
+          <ResponsiveDataTable
+            columns={paymentColumns}
+            data={visiblePayments}
+            keyField="id"
+            pagination={false}
+            paginationPerPage={5}
+          />
+        )}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
           <p className="mb-0">{paymentPage.total} payment{paymentPage.total === 1 ? '' : 's'} total · {visiblePayments.length} shown on this page</p>

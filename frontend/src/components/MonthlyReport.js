@@ -4,16 +4,14 @@ import ResponsiveDataTable from './ResponsiveDataTable';
 import Axios from 'axios';
 import API from '../api/API';
 import cogoToast from '../utils/cogoToast';
-import Select2Field from './Select2Field';
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 class MonthlyReport extends React.Component{
         state={
             dataTable : [],
             token_no   : '',
-            from_date : '',
-            to_date   : '',
-            years : [],
-            selected_year : '',
-            selected_month : '',
+            selected_period : '',
 
         }
 
@@ -21,59 +19,41 @@ class MonthlyReport extends React.Component{
          const token_no = localStorage.getItem('token_no');
          this.setState({token_no : token_no});
 
-         Axios.get(API.GetYearsAndMonths)
-         .then(response=>{
-             this.setState({years : response.data.years});
-
-         })
-         .catch(error=>{
-            
-         });
-
          Axios.get(API.GetAllMonthlyStatement + token_no)
          .then(response=>{
              this.setState({dataTable : response.data});
 
          })
          .catch(error=>{
-            
+            cogoToast.error(error?.response?.data?.message || 'Unable to load monthly statements.');
          });
      }
 
        resetForm=()=>{
-            // this.setState({selected_year : '', selected_month : ''});
+            this.setState({selected_period: ''});
             this.componentDidMount();
         }
      
-      filter=()=>{
-           const {token_no, selected_year, selected_month} = this.state;
-
-           if(selected_year=='' && selected_month=='')
-           {
-             cogoToast.warn('Please select your option!');
-           }
-           else{
+      filter=(period)=>{
+           const {token_no} = this.state;
+           const [selected_year, selected_month] = period.split('-');
+           const monthName = MONTH_NAMES[Number(selected_month) - 1];
+           if (!selected_year || !monthName) return;
                 let myData = new FormData();
                 myData.append('token_no', token_no);
                 myData.append('year', selected_year);
-                myData.append('month', selected_month);
+                myData.append('month', monthName);
 
               Axios.post(API.GetMonthlyStatementByKey, myData)
              .then(response=>{
                  this.setState({dataTable : response.data});
              })
              .catch(error=>{
-                cogoToast.error('Something went wrong!');
+                cogoToast.error(error?.response?.data?.message || 'Unable to load the monthly statement.');
              })
-           }
          } 
 
  render(){
-    const {years} = this.state;
-    const  months = ["January", "February", "March",
-					"April", "May", "June",
-					 "July", "August", "September",
-					 "October",	"November", "December"];
      const statements = [
             {
                 name: 'Year',
@@ -145,31 +125,22 @@ class MonthlyReport extends React.Component{
  		<Fragment>
  			  <div className="container-fluid animated zoomIn transaction-preview">
                     <h3 className="heading-title text-danger text-center m-3">Month Wise Statement</h3><hr/>
-                    <div className="row">
-                    	<div className="col-xs-12 m-1">
-                    		  <b>Year:</b>  <Select2Field value={this.state.selected_year} onChange={(value)=> this.setState({selected_year : value})} ariaLabel="Statement year">
-                                <option value="">Choose Year</option>
-                                {
-                                    years.map((item)=>{
-                                    	return (<option key={item.year} value={item.year}>{item.year}</option>);
-                                    })
-                                }
-                            </Select2Field>
-                    	</div>
-                    	<div className="col-xs-12 m-1">
-                    		 <b>Month:</b> <Select2Field value={this.state.selected_month} onChange={(value)=> this.setState({selected_month : value})} ariaLabel="Statement month">
-                                <option value="">Choose Month</option>
-                                {
-                                    months.map((month)=>{
-                                    	return (<option key={month} value={month}>{month}</option>);
-                                    })
-                                }
-                            </Select2Field>
-                    	</div>                    	
-                    	<div className="col-xs-12 m-1">
-                    		 <button onClick={this.filter} className="btn btn-sm btn-success mx-2">Filter</button>
-                        <button onClick={this.resetForm} className="btn btn-sm btn-danger mx-2">Refresh</button>
-                    	</div>
+                    <div className="report-date-filters">
+                        <label htmlFor="monthly-statement-period">Month and year
+                            <input
+                                id="monthly-statement-period"
+                                className="form-control form-control-sm"
+                                type="month"
+                                value={this.state.selected_period}
+                                onChange={(event) => {
+                                    const period = event.target.value;
+                                    this.setState({selected_period: period});
+                                    if (period) this.filter(period);
+                                    else this.componentDidMount();
+                                }}
+                            />
+                        </label>
+                        <button onClick={this.resetForm} className="btn btn-sm btn-outline-secondary">Reset period</button>
                     </div>
                         
                     </div>

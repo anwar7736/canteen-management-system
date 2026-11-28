@@ -259,7 +259,7 @@ export default function SignupForm() {
 
   return (
     <main className="auth-page">
-      <section className="auth-card w-full max-w-2xl" aria-labelledby="signup-title">
+      <section className="auth-card signup-card w-full" aria-labelledby="signup-title">
         <div className="auth-brand" aria-hidden="true">C</div>
         <p className="auth-eyebrow">{step === 'details' ? 'Start your 14-day trial · Step 1 of 2' : 'Email verification · Step 2 of 2'}</p>
         <h1 id="signup-title">Create your canteen workspace</h1>

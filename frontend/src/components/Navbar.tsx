@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
-import {Link, NavLink, useNavigate} from 'react-router-dom';
+import {Link, NavLink} from 'react-router-dom';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {
     faBars, faBell, faBookOpen, faChartLine, faHouse,
-    faListCheck, faMoneyBillWave, faPowerOff, faUser,
+    faKey, faListCheck, faMoneyBillWave, faPowerOff, faShieldHalved, faUser,
 } from '@fortawesome/free-solid-svg-icons';
 import Axios from 'axios';
 import API from '../api/API';
@@ -25,7 +25,6 @@ function NavigationBar() {
     const [shopLogo, setShopLogo] = useState('');
     const [login, setLogin] = useState(false);
     const [displayName, setDisplayName] = useState('');
-    const navigate = useNavigate();
 
     useEffect(() => {
         const userId = localStorage.getItem('id');
@@ -64,7 +63,7 @@ function NavigationBar() {
         ].forEach((key) => localStorage.removeItem(key));
         window.dispatchEvent(new Event('demo-preview-ended'));
         setLogin(false);
-        navigate('/login', {replace: true});
+        window.location.assign('/login');
     };
 
     const openNotifications = () => {
@@ -128,6 +127,20 @@ function NavigationBar() {
                         onClick={() => setSideNav(false)}
                     >
                         <FontAwesomeIcon icon={faListCheck}/><span>My token</span>
+                    </NavLink>
+                    <NavLink
+                        to="/change_password"
+                        className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`}
+                        onClick={() => setSideNav(false)}
+                    >
+                        <FontAwesomeIcon icon={faKey}/><span>Change password</span>
+                    </NavLink>
+                    <NavLink
+                        to="/security"
+                        className={({isActive}) => `sidebar-link ${isActive ? 'active' : ''}`}
+                        onClick={() => setSideNav(false)}
+                    >
+                        <FontAwesomeIcon icon={faShieldHalved}/><span>Two-factor security</span>
                     </NavLink>
                 </nav>
                 <div className="sidebar-footer">

@@ -62,6 +62,50 @@ class ApiAuthTest extends TestCase
         ])->assertOk()->assertSeeText('0');
     }
 
+    public function test_member_two_factor_setup_is_encrypted_and_login_requires_a_code(): void
+    {
+        $user = $this->createUser('user', 'two-factor');
+        $tenant = Tenant::findOrFail($user->tenant_id);
+        $token = $user->createToken('two-factor-test', ['user'])->plainTextToken;
+        $headers = ['X-Tenant-Slug' => $tenant->slug, 'Authorization' => 'Bearer '.$token];
+
+        $this->withHeaders($headers)
+            ->getJson('/api/user/security/two-factor')
+            ->assertOk()
+            ->assertExactJson(['enabled' => false]);
+
+        $setup = $this->withHeaders($headers)
+            ->postJson('/api/user/security/two-factor/setup')
+            ->assertOk()
+            ->assertJsonStructure(['secret', 'otpauth_url']);
+        $secret = $setup->json('secret');
+        $this->assertMatchesRegularExpression('/^[A-Z2-7]{32}$/', $secret);
+        $this->assertDatabaseMissing('users', ['id' => $user->id, 'two_factor_secret' => $secret]);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/user/security/two-factor/confirm', ['code' => '123456'])
+            ->assertUnprocessable();
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'two_factor_enabled_at' => null]);
+
+        $user->forceFill([
+            'two_factor_secret' => 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+            'two_factor_enabled_at' => now(),
+        ])->save();
+
+        $this->postJson('/api/login', [
+            'username' => $user->username,
+            'password' => 'correct-password',
+        ], ['X-Tenant-Slug' => $tenant->slug])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The authenticator code is invalid or expired.');
+
+        $this->postJson('/api/login/tenant-options', [
+            'username' => $user->username,
+            'password' => 'correct-password',
+            'role' => 'user',
+        ])->assertOk()->assertJsonPath('tenants.0.two_factor_enabled', true);
+    }
+
     public function test_login_tenant_options_only_return_workspaces_with_matching_credentials(): void
     {
         $tenants = collect([
